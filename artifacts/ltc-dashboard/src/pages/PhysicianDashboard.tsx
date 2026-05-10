@@ -52,7 +52,7 @@ import {
   ClipboardList,
   Stethoscope,
 } from "lucide-react";
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
@@ -140,7 +140,7 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
       <div
         onClick={onClose}
         className={[
-          "fixed inset-0 z-40 bg-black/50 transition-opacity duration-300",
+          "fixed inset-0 z-[65] bg-black/50 transition-opacity duration-300",
           isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
         ].join(" ")}
         data-testid="drill-backdrop"
@@ -150,7 +150,7 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
       <aside
         data-testid="drill-panel"
         className={[
-          "fixed top-0 right-0 h-full w-[560px] max-w-full bg-card border-l border-border z-50",
+          "fixed top-0 right-0 h-full w-[560px] max-w-full bg-card border-l border-border z-[70]",
           "flex flex-col shadow-2xl transition-transform duration-300 ease-in-out",
           isOpen ? "translate-x-0" : "translate-x-full",
         ].join(" ")}
@@ -1592,12 +1592,66 @@ function OrderHub() {
   );
 }
 
+// ── Sort helpers ──────────────────────────────────────────────────────────────
+
+type SortKey = "alertLevel" | "lastName" | "firstName" | "room" | "lastBM" | "gaps" | "blood" | "alerts";
+
+function alertScore(r: ResidentAlertSummary) {
+  return r.alertLevel === "red" ? 2 : r.alertLevel === "amber" ? 1 : 0;
+}
+
+function clinicalAlertCount(r: ResidentAlertSummary) {
+  return [
+    r.alertLevel !== "none",
+    r.hasSeverePain,
+    r.behaviorEventCount24h >= 2,
+    r.hasFall24h,
+    r.hasAbnormalVital24h,
+    r.hasTaperActive,
+  ].filter(Boolean).length;
+}
+
+function parseName(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return { firstName: parts[0] ?? "", lastName: parts.slice(1).join(" ") };
+}
+
+function SortTh({ label, sortK, currentKey, currentDir, onSort }: {
+  label: string; sortK: SortKey; currentKey: SortKey;
+  currentDir: "asc" | "desc"; onSort: (k: SortKey) => void;
+}) {
+  const active = currentKey === sortK;
+  return (
+    <th
+      className="px-4 py-4 text-left text-xs uppercase tracking-widest font-bold cursor-pointer select-none whitespace-nowrap transition-colors hover:text-foreground"
+      onClick={() => onSort(sortK)}
+    >
+      <span className={["flex items-center gap-1.5", active ? "text-primary" : "text-muted-foreground"].join(" ")}>
+        {label}
+        <span className="text-[11px] leading-none">
+          {active ? (currentDir === "asc" ? "↑" : "↓") : <span className="opacity-25">↕</span>}
+        </span>
+      </span>
+    </th>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
   const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
   const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe">("population");
+  const [sortKey, setSortKey] = useState<SortKey>("alertLevel");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const handleSort = useCallback((key: SortKey) => {
+    setSortKey((prev) => {
+      if (prev === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      else { setSortDir("desc"); }
+      return key;
+    });
+  }, []);
 
   const { data, isLoading, isError, refetch, isFetching } = useGetPhysicianSummary({
     query: { refetchInterval: 60_000, queryKey: getGetPhysicianSummaryQueryKey() },
@@ -1619,6 +1673,28 @@ export default function PhysicianDashboard() {
     : null;
 
   const monthName = time.toLocaleString("en-US", { month: "long" });
+
+  const sortedResidents = useMemo(() => {
+    if (!data) return [];
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...data.residents].sort((a, b) => {
+      switch (sortKey) {
+        case "alertLevel": return dir * (alertScore(a) - alertScore(b));
+        case "lastName":   return dir * parseName(a.name).lastName.localeCompare(parseName(b.name).lastName);
+        case "firstName":  return dir * parseName(a.name).firstName.localeCompare(parseName(b.name).firstName);
+        case "room":       return dir * a.room.localeCompare(b.room, undefined, { numeric: true });
+        case "lastBM": {
+          const ah = a.hoursSinceLastBM ?? Infinity;
+          const bh = b.hoursSinceLastBM ?? Infinity;
+          return dir * (ah - bh);
+        }
+        case "gaps":   return dir * (a.monthlyGapCount - b.monthlyGapCount);
+        case "blood":  return dir * (a.monthlyBloodCount - b.monthlyBloodCount);
+        case "alerts": return dir * (clinicalAlertCount(a) - clinicalAlertCount(b));
+        default: return 0;
+      }
+    });
+  }, [data, sortKey, sortDir]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -1709,43 +1785,25 @@ export default function PhysicianDashboard() {
         {view === "directory" && <CommHubView />}
         {view === "cpoe" && <OrderHub />}
 
-        {view === "population" && alertCounts && (
-          <section className="grid grid-cols-3 gap-4">
-            <div className="bg-card border-2 border-red-600/40 rounded-xl p-5 flex items-center gap-4" data-testid="card-alert-red">
-              <div className="bg-red-600/15 p-3 rounded-full">
-                <AlertTriangle className="w-6 h-6 text-red-500" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-red-500">{alertCounts.red}</p>
-                <p className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Over 72 Hours</p>
-              </div>
-            </div>
-            <div className="bg-card border-2 border-amber-500/40 rounded-xl p-5 flex items-center gap-4" data-testid="card-alert-amber">
-              <div className="bg-amber-500/15 p-3 rounded-full">
-                <AlertTriangle className="w-6 h-6 text-amber-400" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-amber-400">{alertCounts.amber}</p>
-                <p className="text-sm text-muted-foreground uppercase tracking-wider font-medium">48–72 Hours</p>
-              </div>
-            </div>
-            <div className="bg-card border-2 border-emerald-500/40 rounded-xl p-5 flex items-center gap-4" data-testid="card-alert-none">
-              <div className="bg-emerald-500/15 p-3 rounded-full">
-                <AlertTriangle className="w-6 h-6 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-emerald-400">{alertCounts.none}</p>
-                <p className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Within 48 Hours</p>
-              </div>
-            </div>
-          </section>
-        )}
 
         {/* Resident Summary Table */}
         {view === "population" && <section className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Resident Status — Click any row to view full history
-          </h2>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Resident Status — Click any row to view full history
+            </h2>
+            {/* Badge legend */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground bg-card border border-border rounded-lg px-4 py-2.5">
+              <span className="font-bold uppercase tracking-wider text-muted-foreground/60 shrink-0">Legend:</span>
+              <span><span className="text-base">💩</span> No BM (48h+)</span>
+              <span><span className="text-base">💥</span> Severe pain (24h)</span>
+              <span><span className="text-base">🧠</span> 2+ behaviors (24h)</span>
+              <span><span className="text-base">⚠️</span> Fall (24h)</span>
+              <span><span className="text-base">📉</span> Abnormal vitals (24h)</span>
+              <span><span className="text-base">💊</span> Active taper</span>
+              <span><span className="text-base opacity-30 grayscale inline-block">💊</span> Taper unconfirmed &gt;48h</span>
+            </div>
+          </div>
 
           {isLoading && (
             <div className="bg-card rounded-xl border border-border p-12 text-center text-muted-foreground">
@@ -1760,25 +1818,28 @@ export default function PhysicianDashboard() {
           )}
 
           {data && (
-            <div className="bg-card rounded-xl border border-border overflow-hidden">
+            <div className="bg-card rounded-xl border border-border overflow-x-auto">
               <table className="w-full" data-testid="table-residents">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    {["Alert", "Resident", "Room", "Last BM", "Elapsed", "48h Gaps (Mo.)", "Blood Events (Mo.)", "Clinical Alerts (24h)", ""].map((h) => (
-                      <th
-                        key={h}
-                        className="text-left px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold last:w-8"
-                      >
-                        {h}
-                      </th>
-                    ))}
+                    <SortTh label="Alert"             sortK="alertLevel" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Last Name"         sortK="lastName"   currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortTh label="First Name"        sortK="firstName"  currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Room"              sortK="room"       currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Last BM"           sortK="lastBM"     currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Elapsed"           sortK="lastBM"     currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortTh label="48h Gaps (Mo.)"    sortK="gaps"       currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Blood (Mo.)"       sortK="blood"      currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Clinical Alerts (24h)" sortK="alerts" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <th className="w-8" />
                   </tr>
                 </thead>
                 <tbody>
-                  {data.residents.map((resident, idx) => {
+                  {sortedResidents.map((resident, idx) => {
                     const isRed   = resident.alertLevel === "red";
                     const isAmber = resident.alertLevel === "amber";
                     const isSelected = selectedResident?.residentId === resident.residentId;
+                    const { firstName, lastName } = parseName(resident.name);
 
                     const rowBg = isSelected
                       ? "bg-primary/10 border-l-4 border-l-primary"
@@ -1794,11 +1855,7 @@ export default function PhysicianDashboard() {
                       ? "text-amber-400 font-bold"
                       : "text-foreground font-semibold";
 
-                    const alertDot = isRed
-                      ? "bg-red-500"
-                      : isAmber
-                      ? "bg-amber-400"
-                      : "bg-emerald-500";
+                    const alertDot = isRed ? "bg-red-500" : isAmber ? "bg-amber-400" : "bg-emerald-500";
 
                     return (
                       <tr
@@ -1807,65 +1864,68 @@ export default function PhysicianDashboard() {
                         onClick={() => setSelectedResident(isSelected ? null : resident)}
                         className={[
                           rowBg,
-                          idx < data.residents.length - 1 ? "border-b border-border/50" : "",
+                          idx < sortedResidents.length - 1 ? "border-b border-border/50" : "",
                           "cursor-pointer hover:bg-primary/5 transition-colors group",
                         ].join(" ")}
                       >
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <div className="flex items-center justify-center">
                             <span className={["w-3 h-3 rounded-full", alertDot].join(" ")} data-testid={`alert-dot-${resident.residentId}`} />
                           </div>
                         </td>
-                        <td className="px-6 py-5">
+                        <td className="px-4 py-4">
                           <span className={nameCls} data-testid={`name-resident-${resident.residentId}`}>
-                            {resident.name}
+                            {lastName}
                           </span>
                         </td>
-                        <td className="px-6 py-5 text-muted-foreground font-mono">{resident.room}</td>
-                        <td className="px-6 py-5 text-sm text-muted-foreground font-mono">
+                        <td className="px-4 py-4">
+                          <span className="text-muted-foreground">{firstName}</span>
+                        </td>
+                        <td className="px-4 py-4 text-muted-foreground font-mono">{resident.room}</td>
+                        <td className="px-4 py-4 text-sm text-muted-foreground font-mono whitespace-nowrap">
                           {formatLastBM(resident.lastBMAt)}
                         </td>
-                        <td className="px-6 py-5">
-                          <span className={["text-sm font-semibold font-mono", isRed ? "text-red-400" : isAmber ? "text-amber-400" : "text-muted-foreground"].join(" ")}>
+                        <td className="px-4 py-4">
+                          <span className={["text-sm font-semibold font-mono whitespace-nowrap", isRed ? "text-red-400" : isAmber ? "text-amber-400" : "text-muted-foreground"].join(" ")}>
                             {formatHours(resident.hoursSinceLastBM)}
                           </span>
                         </td>
-                        <td className="px-6 py-5 text-center">
-                          <span className={["text-lg font-bold", resident.monthlyGapCount > 0 ? "text-amber-400" : "text-muted-foreground"].join(" ")}>
+                        <td className="px-4 py-4 text-center">
+                          <span className={["text-base font-bold", resident.monthlyGapCount > 0 ? "text-amber-400" : "text-muted-foreground"].join(" ")}>
                             {resident.monthlyGapCount}
                           </span>
                         </td>
-                        <td className="px-6 py-5 text-center">
-                          <span className={["text-lg font-bold", resident.monthlyBloodCount > 0 ? "text-red-400" : "text-muted-foreground"].join(" ")}>
+                        <td className="px-4 py-4 text-center">
+                          <span className={["text-base font-bold", resident.monthlyBloodCount > 0 ? "text-red-400" : "text-muted-foreground"].join(" ")}>
                             {resident.monthlyBloodCount}
                           </span>
                         </td>
-                        <td className="px-4 py-5">
-                          <div className="flex items-center gap-0.5 flex-wrap min-w-[80px]">
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-0.5 flex-wrap">
                             {(isRed || isAmber) && (
-                              <span title={`No BM for ${resident.hoursSinceLastBM !== null ? Math.round(resident.hoursSinceLastBM) : "?"}h`} className="text-lg leading-none">💩</span>
+                              <span title={`No BM for ${resident.hoursSinceLastBM !== null ? Math.round(resident.hoursSinceLastBM) : "?"}h`} className="text-base leading-none">💩</span>
                             )}
                             {resident.hasSeverePain && (
-                              <span title="Severe pain recorded in last 24h" className="text-lg leading-none">💥</span>
+                              <span title="Severe pain recorded in last 24h" className="text-base leading-none">💥</span>
                             )}
                             {resident.behaviorEventCount24h >= 2 && (
-                              <span title={`${resident.behaviorEventCount24h} behavior events in last 24h`} className="text-lg leading-none">🧠</span>
+                              <span title={`${resident.behaviorEventCount24h} behavior events in last 24h`} className="text-base leading-none">🧠</span>
                             )}
                             {resident.hasFall24h && (
-                              <span title="Fall event recorded in last 24h" className="text-lg leading-none">⚠️</span>
+                              <span title="Fall event recorded in last 24h" className="text-base leading-none">⚠️</span>
                             )}
                             {resident.hasAbnormalVital24h && (
-                              <span title="Abnormal vitals in last 24h" className="text-lg leading-none">📉</span>
+                              <span title="Abnormal vitals in last 24h" className="text-base leading-none">📉</span>
                             )}
                             {resident.hasTaperActive && (
-                              <span title="Active deprescribing taper confirmed by frontline staff" className="text-lg leading-none">💊</span>
+                              <span title="Active deprescribing taper confirmed by frontline staff" className="text-base leading-none">💊</span>
                             )}
                             {!resident.hasTaperActive && resident.hasTaperUnconfirmed && (
-                              <span title="Taper ordered but not yet confirmed by frontline staff (>48h)" className="text-lg leading-none opacity-30 grayscale">💊</span>
+                              <span title="Taper ordered but not yet confirmed by frontline staff (>48h)" className="text-base leading-none opacity-30 grayscale">💊</span>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-5">
+                        <td className="px-4 py-4">
                           <ChevronRight className={["w-4 h-4 text-muted-foreground/40 transition-transform group-hover:text-primary", isSelected ? "rotate-180 text-primary" : ""].join(" ")} />
                         </td>
                       </tr>
