@@ -338,6 +338,8 @@ export const GetPhysicianSummaryResponse = zod.object({
       behaviorEventCount24h: zod.number(),
       hasFall24h: zod.boolean(),
       hasAbnormalVital24h: zod.boolean(),
+      hasTaperActive: zod.boolean(),
+      hasTaperUnconfirmed: zod.boolean(),
     }),
   ),
   facilityMonthlyGaps: zod.number(),
@@ -400,6 +402,68 @@ export const UpdateOrderTemplateResponse = zod.object({
  */
 export const DeleteOrderTemplateParams = zod.object({
   templateId: zod.coerce.number(),
+});
+
+/**
+ * @summary List medication trackers, optionally filtered by resident or status
+ */
+export const ListMedicationTrackersQueryParams = zod.object({
+  residentId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+});
+
+export const ListMedicationTrackersResponseItem = zod.object({
+  id: zod.number(),
+  residentId: zod.number(),
+  residentName: zod.string(),
+  residentRoom: zod.string(),
+  medicationName: zod.string(),
+  dosageInstructions: zod.string().nullish(),
+  status: zod.enum(["Ordered", "Active Taper", "Completed", "Discontinued"]),
+  orderedAt: zod.coerce.date(),
+  startDate: zod.coerce.date().nullish(),
+  reviewDueDate: zod.coerce.date().nullish(),
+  confirmedBy: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+export const ListMedicationTrackersResponse = zod.array(
+  ListMedicationTrackersResponseItem,
+);
+
+/**
+ * @summary Create a new taper/deprescribing order
+ */
+export const CreateMedicationTrackerBody = zod.object({
+  residentId: zod.number(),
+  medicationName: zod.string(),
+  dosageInstructions: zod.string().optional(),
+  notes: zod.string().optional(),
+});
+
+/**
+ * @summary Confirm taper started — sets status to Active Taper, records start_date and 90-day review_due_date
+ */
+export const ConfirmTaperStartedParams = zod.object({
+  trackerId: zod.coerce.number(),
+});
+
+export const ConfirmTaperStartedBody = zod.object({
+  confirmedBy: zod.string(),
+});
+
+export const ConfirmTaperStartedResponse = zod.object({
+  id: zod.number(),
+  residentId: zod.number(),
+  residentName: zod.string(),
+  residentRoom: zod.string(),
+  medicationName: zod.string(),
+  dosageInstructions: zod.string().nullish(),
+  status: zod.enum(["Ordered", "Active Taper", "Completed", "Discontinued"]),
+  orderedAt: zod.coerce.date(),
+  startDate: zod.coerce.date().nullish(),
+  reviewDueDate: zod.coerce.date().nullish(),
+  confirmedBy: zod.string().nullish(),
+  notes: zod.string().nullish(),
 });
 
 /**

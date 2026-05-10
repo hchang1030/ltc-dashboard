@@ -481,6 +481,74 @@ paths:
         "204":
           description: Deleted
 
+  /medication-trackers:
+    get:
+      operationId: listMedicationTrackers
+      tags: [cpoe]
+      summary: List medication trackers, optionally filtered by resident or status
+      parameters:
+        - name: residentId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of medication trackers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MedicationTracker"
+    post:
+      operationId: createMedicationTracker
+      tags: [cpoe]
+      summary: Create a new taper/deprescribing order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MedicationTrackerInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicationTracker"
+
+  /medication-trackers/{trackerId}/confirm:
+    patch:
+      operationId: confirmTaperStarted
+      tags: [cpoe]
+      summary: Confirm taper started — sets status to Active Taper, records start_date and 90-day review_due_date
+      parameters:
+        - name: trackerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmTaperBody"
+      responses:
+        "200":
+          description: Updated tracker
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicationTracker"
+
   /resident-orders:
     post:
       operationId: signResidentOrder
@@ -849,7 +917,7 @@ components:
 
     ResidentAlertSummary:
       type: object
-      required: [residentId, name, room, alertLevel, lastBMAt, hoursSinceLastBM, monthlyGapCount, monthlyBloodCount, hasSeverePain, behaviorEventCount24h, hasFall24h, hasAbnormalVital24h]
+      required: [residentId, name, room, alertLevel, lastBMAt, hoursSinceLastBM, monthlyGapCount, monthlyBloodCount, hasSeverePain, behaviorEventCount24h, hasFall24h, hasAbnormalVital24h, hasTaperActive, hasTaperUnconfirmed]
       properties:
         residentId:
           type: integer
@@ -876,6 +944,10 @@ components:
         hasFall24h:
           type: boolean
         hasAbnormalVital24h:
+          type: boolean
+        hasTaperActive:
+          type: boolean
+        hasTaperUnconfirmed:
           type: boolean
 
     ContactDirectoryEntry:
@@ -1053,4 +1125,57 @@ components:
         residentId:
           type: integer
         orderText:
+          type: string
+
+    MedicationTracker:
+      type: object
+      required: [id, residentId, residentName, residentRoom, medicationName, status, orderedAt]
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        residentName:
+          type: string
+        residentRoom:
+          type: string
+        medicationName:
+          type: string
+        dosageInstructions:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [Ordered, Active Taper, Completed, Discontinued]
+        orderedAt:
+          type: string
+          format: date-time
+        startDate:
+          type: ["string", "null"]
+          format: date-time
+        reviewDueDate:
+          type: ["string", "null"]
+          format: date-time
+        confirmedBy:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    MedicationTrackerInput:
+      type: object
+      required: [residentId, medicationName]
+      properties:
+        residentId:
+          type: integer
+        medicationName:
+          type: string
+        dosageInstructions:
+          type: string
+        notes:
+          type: string
+
+    ConfirmTaperBody:
+      type: object
+      required: [confirmedBy]
+      properties:
+        confirmedBy:
           type: string

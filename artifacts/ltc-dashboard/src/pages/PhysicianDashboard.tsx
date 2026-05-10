@@ -226,7 +226,7 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
                 <Activity className="w-8 h-8 text-muted-foreground/50" />
               </div>
               <p className="text-muted-foreground font-medium">No bowel movements recorded yet</p>
-              <p className="text-muted-foreground/60 text-sm">Use the Care Aide view to log the first entry.</p>
+              <p className="text-muted-foreground/60 text-sm">Use the Frontline Staff view to log the first entry.</p>
             </div>
           )}
           {sorted.map((bm, idx) => {
@@ -1856,6 +1856,12 @@ export default function PhysicianDashboard() {
                             )}
                             {resident.hasAbnormalVital24h && (
                               <span title="Abnormal vitals in last 24h" className="text-lg leading-none">📉</span>
+                            )}
+                            {resident.hasTaperActive && (
+                              <span title="Active deprescribing taper confirmed by frontline staff" className="text-lg leading-none">💊</span>
+                            )}
+                            {!resident.hasTaperActive && resident.hasTaperUnconfirmed && (
+                              <span title="Taper ordered but not yet confirmed by frontline staff (>48h)" className="text-lg leading-none opacity-30 grayscale">💊</span>
                             )}
                           </div>
                         </td>

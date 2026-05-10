@@ -22,4 +22,6 @@ export interface ResidentAlertSummary {
   behaviorEventCount24h: number;
   hasFall24h: boolean;
   hasAbnormalVital24h: boolean;
+  hasTaperActive: boolean;
+  hasTaperUnconfirmed: boolean;
 }

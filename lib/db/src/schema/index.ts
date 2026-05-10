@@ -11,3 +11,4 @@ export * from "./contactDirectory";
 export * from "./communicationLogs";
 export * from "./orderTemplates";
 export * from "./residentOrders";
+export * from "./medicationTrackers";

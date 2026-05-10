@@ -281,6 +281,8 @@ export interface ResidentAlertSummary {
   behaviorEventCount24h: number;
   hasFall24h: boolean;
   hasAbnormalVital24h: boolean;
+  hasTaperActive: boolean;
+  hasTaperUnconfirmed: boolean;
 }
 
 export type ContactDirectoryEntryContactType =
@@ -432,6 +434,47 @@ export interface ResidentOrderInput {
   orderText: string;
 }
 
+export type MedicationTrackerStatus =
+  (typeof MedicationTrackerStatus)[keyof typeof MedicationTrackerStatus];
+
+export const MedicationTrackerStatus = {
+  Ordered: "Ordered",
+  Active_Taper: "Active Taper",
+  Completed: "Completed",
+  Discontinued: "Discontinued",
+} as const;
+
+export interface MedicationTracker {
+  id: number;
+  residentId: number;
+  residentName: string;
+  residentRoom: string;
+  medicationName: string;
+  /** @nullable */
+  dosageInstructions?: string | null;
+  status: MedicationTrackerStatus;
+  orderedAt: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  reviewDueDate?: string | null;
+  /** @nullable */
+  confirmedBy?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface MedicationTrackerInput {
+  residentId: number;
+  medicationName: string;
+  dosageInstructions?: string;
+  notes?: string;
+}
+
+export interface ConfirmTaperBody {
+  confirmedBy: string;
+}
+
 export type ListCommunicationsParams = {
   residentId?: number;
 };
@@ -454,6 +497,11 @@ export const ListBinderEntriesStatus = {
 
 export type ListOrderTemplatesParams = {
   favoritedOnly?: boolean;
+};
+
+export type ListMedicationTrackersParams = {
+  residentId?: number;
+  status?: string;
 };
 
 export type ListResidentOrdersParams = {

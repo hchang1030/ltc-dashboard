@@ -13,6 +13,7 @@ import contactDirectoryRouter from "./contactDirectory";
 import communicationLogsRouter from "./communicationLogs";
 import orderTemplatesRouter from "./orderTemplates";
 import residentOrdersRouter from "./residentOrders";
+import medicationTrackersRouter from "./medicationTrackers";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(contactDirectoryRouter);
 router.use(communicationLogsRouter);
 router.use(orderTemplatesRouter);
 router.use(residentOrdersRouter);
+router.use(medicationTrackersRouter);
 
 export default router;

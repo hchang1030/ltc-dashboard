@@ -24,7 +24,7 @@ function NavBar() {
             : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
         ].join(" ")}
       >
-        Care Aide View
+        Frontline Staff View
       </button>
       <button
         data-testid="nav-physician"

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { desc, and, gte, eq, sql } from "drizzle-orm";
+import { desc, and, gte, eq, sql, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   bowelMovementsTable,
@@ -8,6 +8,7 @@ import {
   behaviorEventsTable,
   fallEventsTable,
   vitalEventsTable,
+  medicationTrackersTable,
 } from "@workspace/db";
 import { GetPhysicianSummaryResponse } from "@workspace/api-zod";
 
@@ -16,6 +17,7 @@ const router: IRouter = Router();
 router.get("/physician/summary", async (req, res): Promise<void> => {
   const now = new Date();
   const h24ago = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const h48ago = new Date(now.getTime() - 48 * 60 * 60 * 1000);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const residents = await db
@@ -34,6 +36,7 @@ router.get("/physician/summary", async (req, res): Promise<void> => {
         behaviorCountRows,
         fallRows,
         abnormalVitalRows,
+        taperRows,
       ] = await Promise.all([
         // Latest BM for gap calculation
         db
@@ -96,6 +99,15 @@ router.get("/physician/summary", async (req, res): Promise<void> => {
             gte(vitalEventsTable.createdAt, h24ago),
           ))
           .limit(1),
+
+        // Taper/deprescribing status for this resident
+        db
+          .select({ status: medicationTrackersTable.status, orderedAt: medicationTrackersTable.orderedAt })
+          .from(medicationTrackersTable)
+          .where(and(
+            eq(medicationTrackersTable.residentId, rid),
+            inArray(medicationTrackersTable.status, ["Ordered", "Active Taper"]),
+          )),
       ]);
 
       // BM alert level
@@ -121,6 +133,11 @@ router.get("/physician/summary", async (req, res): Promise<void> => {
         prevBMTime = new Date(bm.createdAt);
       }
 
+      const hasTaperActive = taperRows.some((t) => t.status === "Active Taper");
+      const hasTaperUnconfirmed = taperRows.some(
+        (t) => t.status === "Ordered" && new Date(t.orderedAt) <= h48ago,
+      );
+
       return {
         residentId: rid,
         name: resident.name,
@@ -134,6 +151,8 @@ router.get("/physician/summary", async (req, res): Promise<void> => {
         behaviorEventCount24h: behaviorCountRows[0]?.count ?? 0,
         hasFall24h: fallRows.length > 0,
         hasAbnormalVital24h: abnormalVitalRows.length > 0,
+        hasTaperActive,
+        hasTaperUnconfirmed,
       };
     }),
   );

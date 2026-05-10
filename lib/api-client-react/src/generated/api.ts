@@ -25,6 +25,7 @@ import type {
   BowelMovementInput,
   CommunicationInput,
   CommunicationLog,
+  ConfirmTaperBody,
   ContactDirectoryEntry,
   ContactDirectoryInput,
   FallEvent,
@@ -36,8 +37,11 @@ import type {
   ListBinderEntriesParams,
   ListBowelMovementsParams,
   ListCommunicationsParams,
+  ListMedicationTrackersParams,
   ListOrderTemplatesParams,
   ListResidentOrdersParams,
+  MedicationTracker,
+  MedicationTrackerInput,
   OrderTemplate,
   OrderTemplateInput,
   PainEvent,
@@ -2202,6 +2206,283 @@ export const useDeleteOrderTemplate = <
   TContext
 > => {
   return useMutation(getDeleteOrderTemplateMutationOptions(options));
+};
+
+/**
+ * @summary List medication trackers, optionally filtered by resident or status
+ */
+export const getListMedicationTrackersUrl = (
+  params?: ListMedicationTrackersParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/medication-trackers?${stringifiedParams}`
+    : `/api/medication-trackers`;
+};
+
+export const listMedicationTrackers = async (
+  params?: ListMedicationTrackersParams,
+  options?: RequestInit,
+): Promise<MedicationTracker[]> => {
+  return customFetch<MedicationTracker[]>(
+    getListMedicationTrackersUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListMedicationTrackersQueryKey = (
+  params?: ListMedicationTrackersParams,
+) => {
+  return [`/api/medication-trackers`, ...(params ? [params] : [])] as const;
+};
+
+export const getListMedicationTrackersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMedicationTrackers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListMedicationTrackersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMedicationTrackers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListMedicationTrackersQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listMedicationTrackers>>
+  > = ({ signal }) =>
+    listMedicationTrackers(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMedicationTrackers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMedicationTrackersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMedicationTrackers>>
+>;
+export type ListMedicationTrackersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List medication trackers, optionally filtered by resident or status
+ */
+
+export function useListMedicationTrackers<
+  TData = Awaited<ReturnType<typeof listMedicationTrackers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListMedicationTrackersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMedicationTrackers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMedicationTrackersQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new taper/deprescribing order
+ */
+export const getCreateMedicationTrackerUrl = () => {
+  return `/api/medication-trackers`;
+};
+
+export const createMedicationTracker = async (
+  medicationTrackerInput: MedicationTrackerInput,
+  options?: RequestInit,
+): Promise<MedicationTracker> => {
+  return customFetch<MedicationTracker>(getCreateMedicationTrackerUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(medicationTrackerInput),
+  });
+};
+
+export const getCreateMedicationTrackerMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMedicationTracker>>,
+    TError,
+    { data: BodyType<MedicationTrackerInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createMedicationTracker>>,
+  TError,
+  { data: BodyType<MedicationTrackerInput> },
+  TContext
+> => {
+  const mutationKey = ["createMedicationTracker"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createMedicationTracker>>,
+    { data: BodyType<MedicationTrackerInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createMedicationTracker(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateMedicationTrackerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createMedicationTracker>>
+>;
+export type CreateMedicationTrackerMutationBody =
+  BodyType<MedicationTrackerInput>;
+export type CreateMedicationTrackerMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new taper/deprescribing order
+ */
+export const useCreateMedicationTracker = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMedicationTracker>>,
+    TError,
+    { data: BodyType<MedicationTrackerInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createMedicationTracker>>,
+  TError,
+  { data: BodyType<MedicationTrackerInput> },
+  TContext
+> => {
+  return useMutation(getCreateMedicationTrackerMutationOptions(options));
+};
+
+/**
+ * @summary Confirm taper started — sets status to Active Taper, records start_date and 90-day review_due_date
+ */
+export const getConfirmTaperStartedUrl = (trackerId: number) => {
+  return `/api/medication-trackers/${trackerId}/confirm`;
+};
+
+export const confirmTaperStarted = async (
+  trackerId: number,
+  confirmTaperBody: ConfirmTaperBody,
+  options?: RequestInit,
+): Promise<MedicationTracker> => {
+  return customFetch<MedicationTracker>(getConfirmTaperStartedUrl(trackerId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(confirmTaperBody),
+  });
+};
+
+export const getConfirmTaperStartedMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof confirmTaperStarted>>,
+    TError,
+    { trackerId: number; data: BodyType<ConfirmTaperBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof confirmTaperStarted>>,
+  TError,
+  { trackerId: number; data: BodyType<ConfirmTaperBody> },
+  TContext
+> => {
+  const mutationKey = ["confirmTaperStarted"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof confirmTaperStarted>>,
+    { trackerId: number; data: BodyType<ConfirmTaperBody> }
+  > = (props) => {
+    const { trackerId, data } = props ?? {};
+
+    return confirmTaperStarted(trackerId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConfirmTaperStartedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof confirmTaperStarted>>
+>;
+export type ConfirmTaperStartedMutationBody = BodyType<ConfirmTaperBody>;
+export type ConfirmTaperStartedMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Confirm taper started — sets status to Active Taper, records start_date and 90-day review_due_date
+ */
+export const useConfirmTaperStarted = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof confirmTaperStarted>>,
+    TError,
+    { trackerId: number; data: BodyType<ConfirmTaperBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof confirmTaperStarted>>,
+  TError,
+  { trackerId: number; data: BodyType<ConfirmTaperBody> },
+  TContext
+> => {
+  return useMutation(getConfirmTaperStartedMutationOptions(options));
 };
 
 /**

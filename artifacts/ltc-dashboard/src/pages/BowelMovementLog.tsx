@@ -18,6 +18,9 @@ import {
   useGetPhysicianSummary,
   getGetPhysicianSummaryQueryKey,
   getListResidentsQueryKey,
+  useListMedicationTrackers,
+  useConfirmTaperStarted,
+  getListMedicationTrackersQueryKey,
 } from "@workspace/api-client-react";
 import type { Resident } from "@workspace/api-client-react";
 import type { PainEventInputSeverity, PainEventInputLocation, BehaviorEventInputType, IntakeEventInputMealPercent } from "@workspace/api-client-react";
@@ -185,7 +188,7 @@ function FormShell({
           <p className="text-xs text-muted-foreground mt-0.5">Room {resident.room} · {title}</p>
         </div>
         <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest shrink-0">
-          {badge ?? "Care Aide"}
+          {badge ?? "Frontline Staff"}
         </span>
       </header>
       <main className="max-w-5xl mx-auto p-6 space-y-8">{children}</main>
@@ -260,11 +263,11 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <header className="sticky top-0 z-30 bg-card border-b border-border px-6 py-3 flex items-center justify-between shadow-md shrink-0">
         <div>
-          <p className="font-bold text-lg text-foreground leading-none">Care Aide — Event Hub</p>
+          <p className="font-bold text-lg text-foreground leading-none">Frontline Staff — Event Hub</p>
           <p className="text-xs text-muted-foreground mt-0.5">Select a resident to log an event</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Care Aide</span>
+          <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Frontline Staff</span>
           <div className="flex items-center gap-1.5 font-mono text-base tabular-nums text-foreground">
             <Clock className="w-4 h-4 text-muted-foreground" />
             {time.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
@@ -346,6 +349,38 @@ const MODULES: {
 function ModuleHub({ resident, onSelectModule, onBack }: {
   resident: Resident; onSelectModule: (m: ViewState) => void; onBack: () => void;
 }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [staffName, setStaffName] = useState("Frontline Staff");
+
+  const { data: allTapers = [] } = useListMedicationTrackers(
+    { residentId: resident.id },
+    { query: { queryKey: getListMedicationTrackersQueryKey({ residentId: resident.id }) } },
+  );
+
+  const confirmTaper = useConfirmTaperStarted();
+
+  const activeTapers = allTapers.filter((t) => t.status === "Ordered" || t.status === "Active Taper");
+  const hasPending = activeTapers.some((t) => t.status === "Ordered");
+
+  const handleConfirm = (trackerId: number, medicationName: string) => {
+    if (!staffName.trim()) {
+      toast({ title: "Enter your name before confirming.", variant: "destructive" });
+      return;
+    }
+    confirmTaper.mutate(
+      { trackerId, data: { confirmedBy: staffName.trim() } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListMedicationTrackersQueryKey({ residentId: resident.id }) });
+          queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
+          toast({ title: "Taper Confirmed", description: `${medicationName} — taper started. 90-day review scheduled.` });
+        },
+        onError: () => toast({ title: "Confirmation failed", variant: "destructive" }),
+      },
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 bg-card border-b border-border px-4 py-3 flex items-center gap-4 shadow-md">
@@ -356,7 +391,7 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
           <p className="font-bold text-base text-foreground leading-none truncate">{resident.name}</p>
           <p className="text-xs text-muted-foreground mt-0.5">Room {resident.room} — Select a care module</p>
         </div>
-        <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest shrink-0">Care Aide</span>
+        <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest shrink-0">Frontline Staff</span>
       </header>
 
       <main className="max-w-3xl mx-auto p-6">
@@ -376,6 +411,66 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
             );
           })}
         </div>
+
+        {activeTapers.length > 0 && (
+          <div className="mt-8 space-y-4">
+            <div className="flex items-center gap-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Active Tapers</p>
+              <span className="bg-indigo-950/60 border border-indigo-700/50 text-indigo-300 px-2.5 py-0.5 rounded-full text-xs font-bold">{activeTapers.length}</span>
+            </div>
+
+            {hasPending && (
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={staffName}
+                  onChange={(e) => setStaffName(e.target.value)}
+                  placeholder="Your name..."
+                  className="flex-1 bg-card border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                />
+                <p className="text-xs text-muted-foreground whitespace-nowrap">Staff name for log</p>
+              </div>
+            )}
+
+            {activeTapers.map((taper) => (
+              <div key={taper.id} className={["rounded-2xl border-2 p-5 space-y-3",
+                taper.status === "Active Taper"
+                  ? "bg-green-950/30 border-green-700/40"
+                  : "bg-indigo-950/40 border-indigo-700/50"].join(" ")}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-foreground text-base">💊 {taper.medicationName}</p>
+                    {taper.dosageInstructions && (
+                      <p className="text-muted-foreground text-sm mt-0.5">{taper.dosageInstructions}</p>
+                    )}
+                  </div>
+                  {taper.status === "Active Taper" ? (
+                    <span className="bg-green-900/60 border border-green-700/50 text-green-300 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shrink-0">✓ Active</span>
+                  ) : (
+                    <span className="bg-amber-900/60 border border-amber-700/50 text-amber-300 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shrink-0">Awaiting Start</span>
+                  )}
+                </div>
+
+                {taper.status === "Active Taper" && taper.startDate && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span>Started: {new Date(taper.startDate).toLocaleDateString()}</span>
+                    {taper.reviewDueDate && <span>Review due: {new Date(taper.reviewDueDate).toLocaleDateString()}</span>}
+                    {taper.confirmedBy && <span>Confirmed by: {taper.confirmedBy}</span>}
+                  </div>
+                )}
+
+                {taper.status === "Ordered" && (
+                  <button
+                    onClick={() => handleConfirm(taper.id, taper.medicationName)}
+                    disabled={confirmTaper.isPending}
+                    className="w-full min-h-[68px] rounded-xl font-bold text-lg bg-indigo-600 hover:bg-indigo-500 text-white border-2 border-indigo-400/50 shadow-lg shadow-indigo-900/30 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3">
+                    {confirmTaper.isPending ? "Confirming..." : "✅ Confirm Taper Started Today"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
