@@ -1,0 +1,58 @@
+You are an expert full-stack Next.js developer building an iPad-optimized Long-Term Care (LTC) EMR. 
+
+Tech Stack: Next.js (App Router), React, Tailwind CSS, Lucide React (icons), Recharts (for trend graphs).
+Constraint: Build a fully interactive frontend prototype using React state and mock data. No backend databases.
+
+Execute the following architecture in a single build. Use modular components. If you hit output limits, pause and wait for me to type "continue".
+
+1. MOCK DATA & STATE ARCHITECTURE
+- Create comprehensive mock data for: Patients, Vitals, Labs, Meds, Progress Notes, Immunizations, Family Questions, and QI Metrics.
+- Include data to support specific resident flags: Falls past 365 days, PRN Laxative doses past 14 days, PRN antipsychotics past 14 days, 48-hour BM gaps.
+
+2. GLOBAL NAVIGATION (Role-Based Access)
+Build a main sidebar to navigate between:
+- Frontline Staff View (Patient list & Comm Binder)
+- Physician View (NLQ Search, Patient list, Comm Binder)
+- QI Dashboard
+- Virtual Health
+- Family Portal
+
+3. FULL-SCREEN PATIENT DETAIL OVERLAY
+When a patient is clicked, open a full-screen overlay.
+HEADER (Overview):
+- Name, Room, Age.
+- Red/Yellow/Green Badges for: # Falls (1yr), # PRN Lax (2wks), # PRN Antipsychotics (2wks), # 48h BM gaps.
+- Vitals strip: Show most recent vitals with exact dates (e.g., BP: 120/80 [May 10], HR: 75 [May 10]). 
+- Clicking any vital opens a Modal with a Recharts trend line graph (Tabs: 1 Year, 2 Years, 3 Years).
+- Button: "Generate Hospital Transfer Pack" (Triggers a modal displaying an aggregated text summary of Meds, ADLs, Vitals, PMHx, SocHx, A&P).
+
+BODY (Split vertically 50/50):
+LEFT HALF (Clinical Data):
+- Progress Notes: A chronological feed. Must include a Filter Dropdown (All, Nurse, PT, OT, SW, Physician, Dietitian).
+- EMAR (Cerner Emulator): Build a table where Rows = Medications (dose/route) and Columns = Time Blocks (0800, 1200, 1800). Cells show color-coded administration status (Given/Green, Missed/Red).
+- Immunizations: Table showing Vaccine Name, Dose, and Date.
+- Bowel Movement Tracker: Replace previous toggles. Include Bristol Scale, Amount buttons, and an "Additional Information" native <select> scroll wheel (Options: None, Blood Present, Mucus Present, Pain/Straining, Incontinent).
+
+RIGHT HALF (Documentation):
+- Top Button: "View Labs". Opens a Drawer from the LEFT edge of the screen showing a table of lab values. The user must be able to select a column, click a "Copy to Notes" button, which formats it as "WBC: 7.2, Hgb: 120" to paste into Assessment/Plan. Clicking a lab name opens a Recharts trend line graph (1, 2, 3 years).
+- Editable Text Areas: Past Medical History, Social History, Assessment and Plan.
+- Read-Only List: Medication List (pulled from pharmacy data).
+
+4. PHYSICIAN "GOOGLE BAR" (NLQ Module)
+- A dedicated page with a massive, persistent search bar.
+- Mock behavior: If the user types "Who has not had an A1C in 1 year", display a filtered list of residents showing their name and their last A1C date/value.
+
+5. QI DASHBOARD
+- Real-time facility metrics table with columns: Metric | Facility Total (Monthly) | High-Risk Flags | Trend.
+- Rows: 48-hour BM Gaps, Bristol Type 1-2, PRN Laxative Doses, Polypharmacy (>8 meds), Falls, Pressure Ulcers, Antipsychotic use.
+
+6. VIRTUAL HEALTH MODULE
+- Mock video conferencing UI showing a 3-way split-screen grid (Physician, Patient/Facility, Interpreter). Includes mute/end call controls.
+
+7. FAMILY PORTAL & COMMUNICATION BINDER
+- Family View: Displays an Education Library (grid of cards for GOC, End of Life, Antipsychotics, Deprescribing, Disability Tax Credit).
+- Family View: Includes a "Submit Question/Concern" text area.
+- Frontline Staff Binder: Shows submitted family questions. Each question has two buttons: [Archive] and [Forward to Physician].
+- Physician Binder: Shows questions forwarded from the Frontline staff.
+
+Ensure the design is strictly iPad optimized. Wire up the state so navigating between these modules feels seamless. Scaffold the Next.js app and begin.

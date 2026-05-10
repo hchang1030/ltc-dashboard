@@ -2,8 +2,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Clock, Star, ChevronRight, ArrowLeft, Search, X,
   Droplets, Zap, Brain, Utensils, AlertOctagon, Activity, Megaphone,
+  FileText, MessageCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PatientOverlay } from "@/components/PatientOverlay";
+import type { OverlayResident } from "@/components/PatientOverlay";
+import { FrontlineCommBinder } from "./PhysicianDashboard";
 import {
   useListResidents,
   useToggleFavorite,
@@ -220,6 +224,7 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
   const [filter, setFilter] = useState<ViewFilter>("all");
   const [search, setSearch] = useState("");
   const [time, setTime] = useState(new Date());
+  const [showBinder, setShowBinder] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: residents = [], isLoading } = useListResidents();
@@ -275,18 +280,36 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
         </div>
       </header>
 
+      {showBinder && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card sticky top-0 z-10">
+            <button onClick={() => setShowBinder(false)}
+              className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Back to Residents
+            </button>
+          </div>
+          <FrontlineCommBinder />
+        </div>
+      )}
+
       <div className="sticky top-[61px] z-20 bg-background border-b border-border px-6 py-3 space-y-3 shrink-0">
         <div className="flex gap-2">
-          <button onClick={() => setFilter("all")}
+          <button onClick={() => { setFilter("all"); setShowBinder(false); }}
             className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all",
-              filter === "all" ? "bg-primary border-primary text-primary-foreground shadow-md" : "bg-card border-border text-muted-foreground hover:border-primary/40"].join(" ")}>
+              !showBinder && filter === "all" ? "bg-primary border-primary text-primary-foreground shadow-md" : "bg-card border-border text-muted-foreground hover:border-primary/40"].join(" ")}>
             All Residents ({residents.length})
           </button>
-          <button onClick={() => setFilter("favorites")}
+          <button onClick={() => { setFilter("favorites"); setShowBinder(false); }}
             className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
-              filter === "favorites" ? "bg-amber-500 border-amber-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-amber-500/40"].join(" ")}>
-            <Star className={["w-4 h-4", filter === "favorites" ? "fill-white" : ""].join(" ")} />
+              !showBinder && filter === "favorites" ? "bg-amber-500 border-amber-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-amber-500/40"].join(" ")}>
+            <Star className={[!showBinder && filter === "favorites" ? "fill-white" : "", "w-4 h-4"].join(" ")} />
             My Patients ({favCount})
+          </button>
+          <button onClick={() => setShowBinder(true)}
+            className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
+              showBinder ? "bg-sky-600 border-sky-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-sky-500/40"].join(" ")}>
+            <MessageCircle className="w-4 h-4" />
+            Family Binder
           </button>
         </div>
         <div className="relative">
@@ -352,6 +375,7 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [staffName, setStaffName] = useState("Frontline Staff");
+  const [overlayRes, setOverlayRes] = useState<OverlayResident | null>(null);
 
   const { data: allTapers = [] } = useListMedicationTrackers(
     { residentId: resident.id },
@@ -391,8 +415,22 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
           <p className="font-bold text-base text-foreground leading-none truncate">{resident.name}</p>
           <p className="text-xs text-muted-foreground mt-0.5">Room {resident.room} — Select a care module</p>
         </div>
+        <button
+          onClick={() => setOverlayRes({
+            residentId: resident.id,
+            name: resident.name,
+            room: resident.room ?? null,
+            dob: resident.dob ? String(resident.dob).slice(0, 10) : null,
+          })}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition-colors text-xs font-bold shrink-0"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          Full Record
+        </button>
         <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest shrink-0">Frontline Staff</span>
       </header>
+
+      <PatientOverlay resident={overlayRes} onClose={() => setOverlayRes(null)} />
 
       <main className="max-w-3xl mx-auto p-6">
         <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-5">What would you like to log?</p>

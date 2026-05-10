@@ -1,0 +1,41 @@
+Execute the following architecture in a single build. Use modular components. If you hit output limits, pause and wait for me to type "continue".
+
+1. MOCK DATA & STATE ARCHITECTURE
+- Create comprehensive mock data for: Patients, Vitals, Labs, Meds, Progress Notes, Immunizations, Family Questions, and QI Metrics.
+- Include data to support specific resident flags: Falls past 365 days, PRN Laxative doses past 14 days, PRN antipsychotics past 14 days, 48-hour BM gaps.
+
+2. VIEW A: FRONTLINE STAFF VIEW
+- Displays the Main Patient List.
+- Displays the "Frontline Communication Binder": Shows questions submitted by families. Each question has two buttons: [Archive] and [Forward to Physician].
+
+3. VIEW B: PHYSICIAN VIEW
+A tabbed or top-nav interface containing:
+- Main Patient List.
+- "Google Bar" (NLQ Module): A massive search bar. If the user types "Who has not had an A1C in 1 year", display a filtered list of residents showing their name and their last A1C date/value.
+- Physician Communication Binder: Shows questions forwarded from the Frontline staff.
+- QI Dashboard: Real-time facility metrics table (Columns: Metric, Total, High-Risk Flags, Trend). Rows: 48-hour BM Gaps, Bristol Type 1-2, PRN Laxative Doses, Polypharmacy (>8 meds), Falls, Pressure Ulcers, Antipsychotic use.
+- Virtual Health: Mock video conferencing UI (3-way split-screen grid: Physician, Patient, Interpreter) with mute/end controls.
+
+4. VIEW C: FAMILY VIEW
+- Education Library: Grid of clickable cards for GOC, End of Life, Antipsychotics, Deprescribing, Disability Tax Credit.
+- Communication Module: A text area to "Submit Question/Concern" that pushes data to the Frontline Binder.
+
+5. SHARED COMPONENT: FULL-SCREEN PATIENT DETAIL OVERLAY
+Clicking a patient from the Patient List (in Staff or Physician view) opens a full-screen overlay.
+HEADER (Overview):
+- Name, Room, Age.
+- Red/Yellow/Green Badges for: # Falls (1yr), # PRN Lax (2wks), # PRN Antipsychotics (2wks), # 48h BM gaps.
+- Vitals strip: Show recent vitals with exact dates. Clicking any vital opens a Modal with a Recharts trend line graph (Tabs: 1yr, 2yr, 3yr).
+- Button: "Generate Hospital Transfer Pack" (Opens modal with aggregated text summary of Meds, ADLs, Vitals, PMHx, SocHx, A&P).
+
+BODY (Split vertically 50/50):
+LEFT HALF (Clinical Data):
+- Progress Notes: Chronological feed with Filter Dropdown (All, Nurse, PT, OT, SW, Physician, Dietitian).
+- EMAR (Cerner Emulator): Table where Rows = Medications (dose/route), Columns = Time Blocks (0800, 1200, 1800). Cells show color-coded administration status (Given/Green, Missed/Red).
+- Immunizations: Table of Vaccine Name, Dose, Date.
+- Bowel Tracker: Bristol Scale buttons, Amount buttons, and an "Additional Information" native <select> scroll wheel (Options: None, Blood Present, Mucus Present, Pain/Straining, Incontinent).
+
+RIGHT HALF (Documentation):
+- Top Button: "View Labs". Opens a Drawer from the LEFT edge showing a lab values table. User can select a column and click "Copy to Notes" to format it as "WBC: 7.2, Hgb: 120" to paste into the Assessment/Plan box. Clicking a lab name opens a Recharts trend graph.
+- Editable Text Areas: Past Medical History, Social History, Assessment and Plan.
+- Read-Only List: Medication List.

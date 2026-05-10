@@ -58,10 +58,25 @@ import {
   Save,
   UserCheck,
   Mic,
+  Search,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Video,
+  VideoOff,
+  PhoneOff,
+  Users,
+  MessageCircle,
+  ExternalLink,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { PatientOverlay } from "@/components/PatientOverlay";
+import {
+  processNLQ, getQIMetrics, getFamilyQuestions, saveFamilyQuestions,
+} from "@/data/mockData";
+import type { NLQResult, FamilyQuestion } from "@/data/mockData";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -112,6 +127,7 @@ const BRISTOL_COLORS: Record<number, { dot: string; label: string; text: string 
 interface DrillPanelProps {
   resident: ResidentAlertSummary | null;
   onClose: () => void;
+  onOpenOverlay?: () => void;
 }
 
 function TagInput({ tags, onAdd, onRemove, placeholder, inputValue, setInputValue }: {
@@ -146,7 +162,7 @@ function TagInput({ tags, onAdd, onRemove, placeholder, inputValue, setInputValu
   );
 }
 
-function DrillPanel({ resident, onClose }: DrillPanelProps) {
+function DrillPanel({ resident, onClose, onOpenOverlay }: DrillPanelProps) {
   const isOpen = resident !== null;
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "notes">("overview");
@@ -359,6 +375,15 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 mt-1">
+            {!isEditing && onOpenOverlay && (
+              <button
+                onClick={onOpenOverlay}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition-colors text-xs font-bold"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Full Record
+              </button>
+            )}
             {!isEditing && (
               <button
                 onClick={openEdit}
@@ -2028,12 +2053,450 @@ function SortTh({ label, sortK, currentKey, currentDir, onSort }: {
   );
 }
 
+// ── NLQ Search View ───────────────────────────────────────────────────────────
+
+function NLQView({ residents }: { residents: ResidentAlertSummary[] }) {
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState<NLQResult>(null);
+  const [searched, setSearched] = useState(false);
+
+  const SUGGESTIONS = [
+    "Who has not had an A1C in 1 year?",
+    "Which residents have falls this year?",
+    "Show residents on PRN laxatives",
+    "Who is on antipsychotics?",
+    "Residents with weight loss",
+    "Show LDL cholesterol values",
+  ];
+
+  const search = (q = query) => {
+    if (!q.trim()) return;
+    setResult(processNLQ(q, residents.map(r => ({ residentId: r.residentId, name: r.name, room: r.room }))));
+    setSearched(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Big search bar */}
+      <div className="relative">
+        <div className="flex items-center gap-3 bg-card border-2 border-border rounded-2xl px-5 py-4 shadow-lg focus-within:border-primary/60 transition-colors">
+          <Search className="w-6 h-6 text-muted-foreground shrink-0" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && search()}
+            placeholder='Ask a clinical question, e.g. "Who has not had an A1C in 1 year?"'
+            className="flex-1 bg-transparent text-lg text-foreground placeholder:text-muted-foreground focus:outline-none"
+            autoFocus
+          />
+          {query && (
+            <button onClick={() => { setQuery(""); setResult(null); setSearched(false); }}
+              className="text-muted-foreground hover:text-foreground transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          )}
+          <button
+            onClick={() => search()}
+            disabled={!query.trim()}
+            className="px-5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors disabled:opacity-40"
+          >
+            Search
+          </button>
+        </div>
+      </div>
+
+      {/* Suggestion chips */}
+      {!searched && (
+        <div className="space-y-3">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Try asking...</p>
+          <div className="flex flex-wrap gap-2">
+            {SUGGESTIONS.map(s => (
+              <button
+                key={s}
+                onClick={() => { setQuery(s); search(s); }}
+                className="px-4 py-2 rounded-full border border-border bg-card hover:bg-muted text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Results */}
+      {result && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-foreground">{result.label}</h3>
+            <span className="text-xs text-muted-foreground font-mono">{result.rows.length} result{result.rows.length !== 1 ? "s" : ""}</span>
+          </div>
+          {result.rows.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground text-sm">
+              No residents match this query.
+            </div>
+          ) : (
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    {result.columns.map(col => (
+                      <th key={col} className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.rows.map((row, i) => (
+                    <tr key={row.residentId} className={["border-b border-border/40 hover:bg-muted/20 transition-colors", i % 2 === 0 ? "" : "bg-muted/10"].join(" ")}>
+                      <td className="px-4 py-3 font-semibold text-foreground">{row.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground font-mono">
+                        {row.room ? `Room ${row.room}` : "—"}
+                      </td>
+                      {row.values.map((v, vi) => (
+                        <td key={vi} className="px-4 py-3 text-foreground">{v}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── QI Dashboard View ─────────────────────────────────────────────────────────
+
+function QIView({ residents }: { residents: ResidentAlertSummary[] }) {
+  const metrics = useMemo(
+    () => getQIMetrics(residents.map(r => r.residentId)),
+    [residents],
+  );
+
+  const TrendIcon = ({ trend }: { trend: "up" | "down" | "stable" }) => {
+    if (trend === "up") return <TrendingUp className="w-4 h-4 text-red-400" />;
+    if (trend === "down") return <TrendingDown className="w-4 h-4 text-emerald-400" />;
+    return <Minus className="w-4 h-4 text-muted-foreground" />;
+  };
+
+  const trendLabel = { up: "Increasing", down: "Improving", stable: "Stable" };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Quality Improvement Dashboard</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Real-time facility metrics — {residents.length} residents</p>
+        </div>
+        <span className="text-xs font-mono text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border">
+          Updated {new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/30">
+              <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Metric</th>
+              <th className="text-center px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</th>
+              <th className="text-center px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">High-Risk Flags</th>
+              <th className="text-center px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">% Affected</th>
+              <th className="text-center px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {metrics.map((m, i) => {
+              const pct = residents.length > 0 ? Math.round((m.total / residents.length) * 100) : 0;
+              const riskPct = m.total > 0 ? Math.round((m.highRisk / m.total) * 100) : 0;
+              return (
+                <tr key={m.metric} className={["border-b border-border/40", i % 2 === 0 ? "" : "bg-muted/10"].join(" ")}>
+                  <td className="px-6 py-4 font-semibold text-foreground">{m.metric}</td>
+                  <td className="px-4 py-4 text-center">
+                    <span className={["text-2xl font-bold", m.total > 0 ? "text-foreground" : "text-muted-foreground"].join(" ")}>{m.total}</span>
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <span className={["text-lg font-bold", m.highRisk > 3 ? "text-red-400" : m.highRisk > 1 ? "text-amber-400" : "text-emerald-400"].join(" ")}>
+                      {m.highRisk}
+                    </span>
+                    {m.highRisk > 0 && <span className="text-xs text-muted-foreground ml-1">({riskPct}% of affected)</span>}
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={["h-full rounded-full", pct > 30 ? "bg-red-500" : pct > 15 ? "bg-amber-500" : "bg-emerald-500"].join(" ")}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-mono text-muted-foreground w-8">{pct}%</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <TrendIcon trend={m.trend} />
+                      <span className="text-xs text-muted-foreground">{trendLabel[m.trend]}</span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs text-muted-foreground text-center">
+        Data is based on events logged in the past 14–365 days depending on metric. High-risk flags indicate residents requiring immediate clinical review.
+      </p>
+    </div>
+  );
+}
+
+// ── Virtual Health View ───────────────────────────────────────────────────────
+
+function VirtualHealthView() {
+  const [muted, setMuted] = useState(false);
+  const [cameraOff, setCameraOff] = useState(false);
+  const [callActive, setCallActive] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!callActive) return;
+    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [callActive]);
+
+  const formatElapsed = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  };
+
+  const participants = [
+    { label: "Dr. Sarah Chang", role: "Attending Physician", img: "https://i.pravatar.cc/300?img=49", self: true },
+    { label: "Margaret Chen", role: "Patient · Room 101", img: "https://i.pravatar.cc/300?img=1", self: false },
+    { label: "Interpreter (French)", role: "Language Services", img: "https://i.pravatar.cc/300?img=33", self: false },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Virtual Health Consultation</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">3-way video session — mock UI</p>
+        </div>
+        {callActive && (
+          <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 px-4 py-2 rounded-full">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-sm font-bold text-red-300 font-mono">{formatElapsed(elapsed)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Video grid */}
+      <div className="grid grid-cols-3 gap-4">
+        {participants.map((p, i) => (
+          <div key={i} className={["relative rounded-2xl overflow-hidden aspect-video border-2 shadow-xl",
+            p.self ? "border-primary" : "border-border"].join(" ")}>
+            <img src={p.img} alt={p.label} className="w-full h-full object-cover" style={{ filter: cameraOff && p.self ? "brightness(0.1)" : "none" }} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 px-4 py-3">
+              <p className="text-sm font-bold text-white">{p.label}</p>
+              <p className="text-xs text-white/70">{p.role}</p>
+            </div>
+            {p.self && cameraOff && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                <VideoOff className="w-10 h-10 text-muted-foreground" />
+              </div>
+            )}
+            {p.self && <span className="absolute top-3 right-3 text-[10px] font-bold bg-primary/90 text-primary-foreground px-2 py-0.5 rounded-full">YOU</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Controls */}
+      {callActive ? (
+        <div className="flex items-center justify-center gap-4">
+          <button onClick={() => setMuted(m => !m)}
+            className={["w-14 h-14 rounded-full border-2 flex items-center justify-center transition-colors",
+              muted ? "bg-red-900/40 border-red-500/60 text-red-400" : "bg-muted border-border text-muted-foreground hover:bg-muted/80"].join(" ")}>
+            {muted ? <VideoOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+          </button>
+          <button onClick={() => setCameraOff(c => !c)}
+            className={["w-14 h-14 rounded-full border-2 flex items-center justify-center transition-colors",
+              cameraOff ? "bg-red-900/40 border-red-500/60 text-red-400" : "bg-muted border-border text-muted-foreground hover:bg-muted/80"].join(" ")}>
+            {cameraOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+          </button>
+          <button onClick={() => setCallActive(false)}
+            className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 border-2 border-red-400 flex items-center justify-center transition-colors shadow-lg">
+            <PhoneOff className="w-7 h-7 text-white" />
+          </button>
+          <button className="w-14 h-14 rounded-full border-2 border-border bg-muted text-muted-foreground flex items-center justify-center hover:bg-muted/80 transition-colors">
+            <Users className="w-6 h-6" />
+          </button>
+          <button className="w-14 h-14 rounded-full border-2 border-border bg-muted text-muted-foreground flex items-center justify-center hover:bg-muted/80 transition-colors">
+            <MessageCircle className="w-6 h-6" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-4 py-8">
+          <p className="text-lg font-bold text-muted-foreground">Call Ended — {formatElapsed(elapsed)}</p>
+          <button onClick={() => { setCallActive(true); setElapsed(0); }}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-colors">
+            <Video className="w-4 h-4" />
+            Start New Call
+          </button>
+        </div>
+      )}
+
+      <p className="text-xs text-center text-muted-foreground/50">
+        This is a mock interface for demonstration. Real video calls would be powered by a WebRTC integration.
+      </p>
+    </div>
+  );
+}
+
+// ── Family Q&A View (Physician Receives Forwarded Questions) ──────────────────
+
+function FamilyQAView() {
+  const [questions, setQuestions] = useState<FamilyQuestion[]>([]);
+  const { toast } = useToast();
+
+  const reload = () => setQuestions(getFamilyQuestions().filter(q => q.status === "forwarded"));
+
+  useEffect(() => { reload(); }, []);
+
+  const resolve = (id: string) => {
+    const qs = getFamilyQuestions().map(q => q.id === id ? { ...q, status: "archived" as const } : q);
+    saveFamilyQuestions(qs);
+    reload();
+    toast({ title: "Question Resolved", description: "Marked as addressed and archived." });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Family Questions — Forwarded for Physician Review</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Questions submitted by families and forwarded by frontline staff</p>
+        </div>
+        <button onClick={reload} className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors">
+          Refresh
+        </button>
+      </div>
+
+      {questions.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-10 text-center space-y-2">
+          <MessageCircle className="w-8 h-8 text-muted-foreground/30 mx-auto" />
+          <p className="text-muted-foreground text-sm">No forwarded questions at this time.</p>
+          <p className="text-xs text-muted-foreground/60">Questions forwarded by frontline staff will appear here.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {questions.map(q => (
+            <div key={q.id} className="rounded-xl border border-sky-500/20 bg-sky-900/10 p-5 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-foreground">{q.residentName} · <span className="font-normal text-muted-foreground">Room {q.residentId - 5}</span></p>
+                  <p className="text-xs text-sky-400 mt-0.5">From: {q.familyName}</p>
+                </div>
+                <p className="text-xs font-mono text-muted-foreground shrink-0">
+                  {new Date(q.date).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
+                </p>
+              </div>
+              <p className="text-sm text-foreground/85 leading-relaxed border-l-2 border-sky-500/40 pl-4">{q.question}</p>
+              <button
+                onClick={() => resolve(q.id)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-900/30 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-900/50 text-xs font-bold transition-colors"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Mark Addressed &amp; Archive
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Frontline Family Binder (used in Frontline Staff view) ────────────────────
+
+export function FrontlineCommBinder() {
+  const [questions, setQuestions] = useState<FamilyQuestion[]>([]);
+  const { toast } = useToast();
+
+  const reload = () => setQuestions(getFamilyQuestions().filter(q => q.status === "pending"));
+
+  useEffect(() => { reload(); }, []);
+
+  const archive = (id: string) => {
+    const qs = getFamilyQuestions().map(q => q.id === id ? { ...q, status: "archived" as const } : q);
+    saveFamilyQuestions(qs);
+    reload();
+    toast({ title: "Archived", description: "Question removed from binder." });
+  };
+
+  const forward = (id: string) => {
+    const qs = getFamilyQuestions().map(q => q.id === id ? { ...q, status: "forwarded" as const } : q);
+    saveFamilyQuestions(qs);
+    reload();
+    toast({ title: "Forwarded to Physician", description: "Question will appear in the Physician Family Q&A tab." });
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-30 bg-card border-b border-border px-6 py-4 shadow-sm">
+        <h1 className="text-base font-bold">Family Communication Binder</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">Questions submitted by families — review and forward to physician as needed</p>
+      </header>
+      <main className="max-w-3xl mx-auto px-6 py-6 space-y-4">
+        {questions.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card p-10 text-center space-y-2">
+            <MessageCircle className="w-8 h-8 text-muted-foreground/30 mx-auto" />
+            <p className="text-muted-foreground text-sm">No pending family questions.</p>
+            <p className="text-xs text-muted-foreground/60">New questions submitted by families will appear here.</p>
+          </div>
+        ) : (
+          questions.map(q => (
+            <div key={q.id} className="rounded-xl border border-border bg-card p-5 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-foreground">{q.residentName}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">From: {q.familyName}</p>
+                </div>
+                <p className="text-xs font-mono text-muted-foreground shrink-0">
+                  {new Date(q.date).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
+                </p>
+              </div>
+              <p className="text-sm text-foreground/80 leading-relaxed">{q.question}</p>
+              <div className="flex gap-2">
+                <button onClick={() => forward(q.id)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sky-900/30 text-sky-400 border border-sky-500/30 hover:bg-sky-900/50 text-xs font-bold transition-colors">
+                  <Send className="w-3.5 h-3.5" />
+                  Forward to Physician
+                </button>
+                <button onClick={() => archive(q.id)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-muted text-muted-foreground border border-border hover:bg-muted/80 text-xs font-semibold transition-colors">
+                  Archive
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </main>
+    </div>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
   const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
-  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe">("population");
+  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual" | "familyqa">("population");
+  const [overlayResident, setOverlayResident] = useState<ResidentAlertSummary | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -2169,6 +2632,54 @@ export default function PhysicianDashboard() {
             <Stethoscope className="w-4 h-4" />
             CPOE
           </button>
+          <button
+            onClick={() => setView("nlq")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "nlq"
+                ? "bg-cyan-700/20 border-cyan-500 text-cyan-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-cyan-500/40",
+            ].join(" ")}
+          >
+            <Search className="w-4 h-4" />
+            NLQ Search
+          </button>
+          <button
+            onClick={() => setView("qi")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "qi"
+                ? "bg-emerald-700/20 border-emerald-500 text-emerald-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-emerald-500/40",
+            ].join(" ")}
+          >
+            <TrendingUp className="w-4 h-4" />
+            QI Dashboard
+          </button>
+          <button
+            onClick={() => setView("virtual")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "virtual"
+                ? "bg-blue-700/20 border-blue-500 text-blue-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-blue-500/40",
+            ].join(" ")}
+          >
+            <Video className="w-4 h-4" />
+            Virtual Health
+          </button>
+          <button
+            onClick={() => setView("familyqa")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "familyqa"
+                ? "bg-rose-700/20 border-rose-500 text-rose-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-rose-500/40",
+            ].join(" ")}
+          >
+            <MessageCircle className="w-4 h-4" />
+            Family Q&amp;A
+          </button>
         </div>
       </div>
 
@@ -2176,7 +2687,10 @@ export default function PhysicianDashboard() {
         {view === "binder" && <VirtualBinder />}
         {view === "directory" && <CommHubView />}
         {view === "cpoe" && <OrderHub />}
-
+        {view === "nlq" && data && <NLQView residents={data.residents} />}
+        {view === "qi" && data && <QIView residents={data.residents} />}
+        {view === "virtual" && <VirtualHealthView />}
+        {view === "familyqa" && <FamilyQAView />}
 
         {/* Resident Summary Table */}
         {view === "population" && <section className="space-y-3">
@@ -2350,7 +2864,25 @@ export default function PhysicianDashboard() {
       </main>
 
       {/* Drill-down panel */}
-      <DrillPanel resident={selectedResident} onClose={handleClose} />
+      <DrillPanel
+        resident={selectedResident}
+        onClose={handleClose}
+        onOpenOverlay={selectedResident ? () => setOverlayResident(selectedResident) : undefined}
+      />
+
+      {/* Full patient record overlay */}
+      <PatientOverlay
+        resident={overlayResident ? {
+          residentId: overlayResident.residentId,
+          name: overlayResident.name,
+          room: overlayResident.room ?? null,
+          dob: overlayResident.dob ?? null,
+          codeStatus: overlayResident.codeStatus ?? null,
+          allergies: overlayResident.allergies ?? [],
+          infectionFlags: overlayResident.infectionFlags ?? [],
+        } : null}
+        onClose={() => setOverlayResident(null)}
+      />
     </div>
   );
 }

@@ -5,39 +5,36 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import BowelMovementLog from "@/pages/BowelMovementLog";
 import PhysicianDashboard from "@/pages/PhysicianDashboard";
+import FamilyView from "@/pages/FamilyView";
 
 const queryClient = new QueryClient();
 
 function NavBar() {
   const [location, setLocation] = useLocation();
-  const isPhysician = location === "/physician";
+
+  const tabs = [
+    { path: "/", label: "Frontline Staff View", testId: "nav-care-aide" },
+    { path: "/physician", label: "Physician View", testId: "nav-physician" },
+    { path: "/family", label: "Family Portal", testId: "nav-family" },
+  ];
 
   return (
     <div className="sticky top-0 z-[60] bg-background border-b border-border flex">
-      <button
-        data-testid="nav-care-aide"
-        onClick={() => setLocation("/")}
-        className={[
-          "flex-1 py-3 text-sm font-bold uppercase tracking-widest transition-colors",
-          !isPhysician
-            ? "text-primary border-b-2 border-primary bg-card"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
-        ].join(" ")}
-      >
-        Frontline Staff View
-      </button>
-      <button
-        data-testid="nav-physician"
-        onClick={() => setLocation("/physician")}
-        className={[
-          "flex-1 py-3 text-sm font-bold uppercase tracking-widest transition-colors",
-          isPhysician
-            ? "text-primary border-b-2 border-primary bg-card"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
-        ].join(" ")}
-      >
-        Physician View
-      </button>
+      {tabs.map(t => (
+        <button
+          key={t.path}
+          data-testid={t.testId}
+          onClick={() => setLocation(t.path)}
+          className={[
+            "flex-1 py-3 text-sm font-bold uppercase tracking-widest transition-colors",
+            location === t.path
+              ? "text-primary border-b-2 border-primary bg-card"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
+          ].join(" ")}
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -49,6 +46,7 @@ function Router() {
       <Switch>
         <Route path="/" component={BowelMovementLog} />
         <Route path="/physician" component={PhysicianDashboard} />
+        <Route path="/family" component={FamilyView} />
         <Route component={NotFound} />
       </Switch>
     </>
