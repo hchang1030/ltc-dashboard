@@ -97,6 +97,7 @@ export const CreatePainEventBody = zod.object({
   location: zod.enum(["Back", "Legs", "Chest", "Head", "Abdomen", "Other"]),
   prnGiven: zod.boolean().optional(),
   clinicalNote: zod.string(),
+  recordedAt: zod.coerce.date().optional(),
 });
 
 /**
@@ -115,6 +116,7 @@ export const CreateBehaviorEventBody = zod.object({
   intensity: zod.enum(["Low", "High"]),
   durationMins: zod.number().optional(),
   clinicalNote: zod.string(),
+  recordedAt: zod.coerce.date().optional(),
 });
 
 /**
@@ -123,6 +125,7 @@ export const CreateBehaviorEventBody = zod.object({
 export const CreateIntakeEventBody = zod.object({
   residentId: zod.number(),
   staffId: zod.string().optional(),
+  mealType: zod.enum(["Breakfast", "Lunch", "Dinner", "Snack"]).optional(),
   mealPercent: zod.union([
     zod.literal(0),
     zod.literal(25),
@@ -133,6 +136,7 @@ export const CreateIntakeEventBody = zod.object({
   fluidMl: zod.number(),
   supplementsGiven: zod.boolean().optional(),
   clinicalNote: zod.string(),
+  recordedAt: zod.coerce.date().optional(),
 });
 
 /**
@@ -145,6 +149,7 @@ export const CreateFallEventBody = zod.object({
   apparentInjury: zod.boolean(),
   neuroVitalsStarted: zod.boolean(),
   clinicalNote: zod.string(),
+  recordedAt: zod.coerce.date().optional(),
 });
 
 /**

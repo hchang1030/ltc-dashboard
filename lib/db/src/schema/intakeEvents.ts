@@ -7,6 +7,7 @@ export const intakeEventsTable = pgTable("intake_events", {
   id: serial("id").primaryKey(),
   residentId: integer("resident_id").notNull().references(() => residentsTable.id),
   staffId: text("staff_id"),
+  mealType: text("meal_type"), // Breakfast | Lunch | Dinner | Snack
   mealPercent: integer("meal_percent").notNull(), // 0 | 25 | 50 | 75 | 100
   fluidMl: integer("fluid_ml").notNull().default(0),
   supplementsGiven: boolean("supplements_given").notNull().default(false),

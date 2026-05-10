@@ -13,7 +13,13 @@ router.post("/pain-events", async (req, res): Promise<void> => {
     return;
   }
 
-  const [row] = await db.insert(painEventsTable).values(parsed.data).returning();
+  const { recordedAt, ...data } = parsed.data;
+
+  const [row] = await db
+    .insert(painEventsTable)
+    .values({ ...data, ...(recordedAt ? { createdAt: new Date(recordedAt) } : {}) })
+    .returning();
+
   req.log.info({ id: row.id, residentId: row.residentId, severity: row.severity }, "Pain event recorded");
   res.status(201).json(row);
 });

@@ -11,6 +11,8 @@ export interface IntakeEvent {
   residentId: number;
   /** @nullable */
   staffId?: string | null;
+  /** @nullable */
+  mealType?: string | null;
   mealPercent: number;
   fluidMl: number;
   supplementsGiven: boolean;

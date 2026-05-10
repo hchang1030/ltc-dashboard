@@ -6,12 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { IntakeEventInputMealPercent } from "./intakeEventInputMealPercent";
+import type { IntakeEventInputMealType } from "./intakeEventInputMealType";
 
 export interface IntakeEventInput {
   residentId: number;
   staffId?: string;
+  mealType?: IntakeEventInputMealType;
   mealPercent: IntakeEventInputMealPercent;
   fluidMl: number;
   supplementsGiven?: boolean;
   clinicalNote: string;
+  recordedAt?: Date;
 }

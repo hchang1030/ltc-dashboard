@@ -20,6 +20,7 @@ export * from "./healthStatus";
 export * from "./intakeEvent";
 export * from "./intakeEventInput";
 export * from "./intakeEventInputMealPercent";
+export * from "./intakeEventInputMealType";
 export * from "./listBowelMovementsParams";
 export * from "./painEvent";
 export * from "./painEventInput";

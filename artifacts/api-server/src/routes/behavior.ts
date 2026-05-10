@@ -13,7 +13,13 @@ router.post("/behavior-events", async (req, res): Promise<void> => {
     return;
   }
 
-  const [row] = await db.insert(behaviorEventsTable).values(parsed.data).returning();
+  const { recordedAt, ...data } = parsed.data;
+
+  const [row] = await db
+    .insert(behaviorEventsTable)
+    .values({ ...data, ...(recordedAt ? { createdAt: new Date(recordedAt) } : {}) })
+    .returning();
+
   req.log.info({ id: row.id, residentId: row.residentId, type: row.type }, "Behavior event recorded");
   res.status(201).json(row);
 });

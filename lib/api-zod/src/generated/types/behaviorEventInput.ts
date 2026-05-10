@@ -15,4 +15,5 @@ export interface BehaviorEventInput {
   intensity: BehaviorEventInputIntensity;
   durationMins?: number;
   clinicalNote: string;
+  recordedAt?: Date;
 }

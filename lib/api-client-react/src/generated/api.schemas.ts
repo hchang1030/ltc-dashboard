@@ -93,6 +93,7 @@ export interface PainEventInput {
   location: PainEventInputLocation;
   prnGiven?: boolean;
   clinicalNote: string;
+  recordedAt?: string;
 }
 
 export interface PainEvent {
@@ -133,6 +134,7 @@ export interface BehaviorEventInput {
   intensity: BehaviorEventInputIntensity;
   durationMins?: number;
   clinicalNote: string;
+  recordedAt?: string;
 }
 
 export interface BehaviorEvent {
@@ -148,6 +150,16 @@ export interface BehaviorEvent {
   createdAt: string;
 }
 
+export type IntakeEventInputMealType =
+  (typeof IntakeEventInputMealType)[keyof typeof IntakeEventInputMealType];
+
+export const IntakeEventInputMealType = {
+  Breakfast: "Breakfast",
+  Lunch: "Lunch",
+  Dinner: "Dinner",
+  Snack: "Snack",
+} as const;
+
 export type IntakeEventInputMealPercent =
   (typeof IntakeEventInputMealPercent)[keyof typeof IntakeEventInputMealPercent];
 
@@ -162,10 +174,12 @@ export const IntakeEventInputMealPercent = {
 export interface IntakeEventInput {
   residentId: number;
   staffId?: string;
+  mealType?: IntakeEventInputMealType;
   mealPercent: IntakeEventInputMealPercent;
   fluidMl: number;
   supplementsGiven?: boolean;
   clinicalNote: string;
+  recordedAt?: string;
 }
 
 export interface IntakeEvent {
@@ -173,6 +187,8 @@ export interface IntakeEvent {
   residentId: number;
   /** @nullable */
   staffId?: string | null;
+  /** @nullable */
+  mealType?: string | null;
   mealPercent: number;
   fluidMl: number;
   supplementsGiven: boolean;
@@ -187,6 +203,7 @@ export interface FallEventInput {
   apparentInjury: boolean;
   neuroVitalsStarted: boolean;
   clinicalNote: string;
+  recordedAt?: string;
 }
 
 export interface FallEvent {

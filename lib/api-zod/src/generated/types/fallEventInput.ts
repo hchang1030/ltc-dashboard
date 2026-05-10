@@ -13,4 +13,5 @@ export interface FallEventInput {
   apparentInjury: boolean;
   neuroVitalsStarted: boolean;
   clinicalNote: string;
+  recordedAt?: Date;
 }

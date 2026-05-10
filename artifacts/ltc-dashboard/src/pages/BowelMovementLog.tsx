@@ -520,6 +520,8 @@ function PainForm({ resident, onBack }: { resident: Resident; onBack: () => void
   const [severity, setSeverity] = useState<PainEventInputSeverity | null>(null);
   const [location, setLocation] = useState<PainEventInputLocation | null>(null);
   const [prnGiven, setPrnGiven] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr);
+  const [selectedHour, setSelectedHour] = useState<number>(getCurrentHour);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -536,11 +538,14 @@ function PainForm({ resident, onBack }: { resident: Resident; onBack: () => void
 
   const hasData = !!severity;
 
-  const handleReset = () => { setSeverity(null); setLocation(null); setPrnGiven(false); };
+  const handleReset = () => {
+    setSeverity(null); setLocation(null); setPrnGiven(false);
+    setSelectedDate(getTodayDateStr()); setSelectedHour(getCurrentHour());
+  };
 
   const handleSave = () => {
     if (!severity || !location) { toast({ title: "Incomplete entry", description: "Select severity and location.", variant: "destructive" }); return; }
-    createPain.mutate({ data: { residentId: resident.id, severity, location, prnGiven, clinicalNote: note } }, {
+    createPain.mutate({ data: { residentId: resident.id, severity, location, prnGiven, clinicalNote: note, recordedAt: buildRecordedAt(selectedDate, selectedHour) } }, {
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
@@ -554,6 +559,20 @@ function PainForm({ resident, onBack }: { resident: Resident; onBack: () => void
   return (
     <FormShell resident={resident} title="Pain Assessment" onBack={onBack}
       onReset={handleReset} onSave={handleSave} hasData={hasData} isSaving={createPain.isPending}>
+      <section className="space-y-3">
+        <SectionLabel>Date &amp; Time of Observation</SectionLabel>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-center text-muted-foreground uppercase tracking-wider">Date</p>
+            <ScrollPicker items={DATE_ITEMS} value={selectedDate} onChange={(v) => setSelectedDate(v as string)} />
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-center text-muted-foreground uppercase tracking-wider">Time</p>
+            <ScrollPicker items={HOUR_ITEMS} value={selectedHour} onChange={(v) => setSelectedHour(v as number)} />
+          </div>
+        </div>
+      </section>
+
       <section className="space-y-3">
         <SectionLabel>Pain Severity</SectionLabel>
         <div className="grid grid-cols-2 gap-4">
@@ -607,6 +626,8 @@ function BehaviorForm({ resident, onBack }: { resident: Resident; onBack: () => 
   const [type, setType] = useState<BehaviorEventInputType | null>(null);
   const [intensity, setIntensity] = useState<"Low" | "High" | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr);
+  const [selectedHour, setSelectedHour] = useState<number>(getCurrentHour);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -621,11 +642,14 @@ function BehaviorForm({ resident, onBack }: { resident: Resident; onBack: () => 
   }, [type, intensity, duration]);
 
   const hasData = !!type;
-  const handleReset = () => { setType(null); setIntensity(null); setDuration(null); };
+  const handleReset = () => {
+    setType(null); setIntensity(null); setDuration(null);
+    setSelectedDate(getTodayDateStr()); setSelectedHour(getCurrentHour());
+  };
 
   const handleSave = () => {
     if (!type || !intensity) { toast({ title: "Incomplete entry", description: "Select behavior type and intensity.", variant: "destructive" }); return; }
-    createBehavior.mutate({ data: { residentId: resident.id, type, intensity, durationMins: duration ?? undefined, clinicalNote: note } }, {
+    createBehavior.mutate({ data: { residentId: resident.id, type, intensity, durationMins: duration ?? undefined, clinicalNote: note, recordedAt: buildRecordedAt(selectedDate, selectedHour) } }, {
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
@@ -639,6 +663,20 @@ function BehaviorForm({ resident, onBack }: { resident: Resident; onBack: () => 
   return (
     <FormShell resident={resident} title="Behavior Event" onBack={onBack}
       onReset={handleReset} onSave={handleSave} hasData={hasData} isSaving={createBehavior.isPending}>
+      <section className="space-y-3">
+        <SectionLabel>Date &amp; Time of Observation</SectionLabel>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-center text-muted-foreground uppercase tracking-wider">Date</p>
+            <ScrollPicker items={DATE_ITEMS} value={selectedDate} onChange={(v) => setSelectedDate(v as string)} />
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-center text-muted-foreground uppercase tracking-wider">Time</p>
+            <ScrollPicker items={HOUR_ITEMS} value={selectedHour} onChange={(v) => setSelectedHour(v as number)} />
+          </div>
+        </div>
+      </section>
+
       <section className="space-y-3">
         <SectionLabel>Behavior Type</SectionLabel>
         <div className="grid grid-cols-2 gap-3">
@@ -692,10 +730,21 @@ function BehaviorForm({ resident, onBack }: { resident: Resident; onBack: () => 
 
 // ── ── ── Screen 3d: Intake Form ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
+const MEAL_TYPES = [
+  { value: "Breakfast", color: "bg-amber-900/60 border-amber-600 text-amber-200", icon: "🌅" },
+  { value: "Lunch",     color: "bg-yellow-900/60 border-yellow-600 text-yellow-200", icon: "☀️" },
+  { value: "Dinner",    color: "bg-orange-900/60 border-orange-600 text-orange-200", icon: "🌙" },
+  { value: "Snack",     color: "bg-teal-900/60 border-teal-500 text-teal-200", icon: "🍎" },
+] as const;
+type MealType = typeof MEAL_TYPES[number]["value"];
+
 function IntakeForm({ resident, onBack }: { resident: Resident; onBack: () => void }) {
+  const [mealType, setMealType] = useState<MealType | null>(null);
   const [mealPercent, setMealPercent] = useState<IntakeEventInputMealPercent | null>(null);
   const [fluidMl, setFluidMl] = useState(0);
   const [supplementsGiven, setSupplementsGiven] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr);
+  const [selectedHour, setSelectedHour] = useState<number>(getCurrentHour);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -704,18 +753,22 @@ function IntakeForm({ resident, onBack }: { resident: Resident; onBack: () => vo
   const note = useMemo(() => {
     if (mealPercent === null && fluidMl === 0) return "Awaiting documentation input...";
     let n = "";
+    if (mealType) n += `${mealType}: `;
     if (mealPercent !== null) n += `Consumed ${mealPercent}% of meal offering. `;
     if (fluidMl > 0) n += `Fluid intake: ${fluidMl}mL. `;
     n += `Supplements: ${supplementsGiven ? "given" : "not given"}.`;
     return n.trim();
-  }, [mealPercent, fluidMl, supplementsGiven]);
+  }, [mealType, mealPercent, fluidMl, supplementsGiven]);
 
-  const hasData = mealPercent !== null || fluidMl > 0;
-  const handleReset = () => { setMealPercent(null); setFluidMl(0); setSupplementsGiven(false); };
+  const hasData = mealPercent !== null || fluidMl > 0 || mealType !== null;
+  const handleReset = () => {
+    setMealType(null); setMealPercent(null); setFluidMl(0); setSupplementsGiven(false);
+    setSelectedDate(getTodayDateStr()); setSelectedHour(getCurrentHour());
+  };
 
   const handleSave = () => {
     if (mealPercent === null) { toast({ title: "Incomplete entry", description: "Select a meal percentage.", variant: "destructive" }); return; }
-    createIntake.mutate({ data: { residentId: resident.id, mealPercent, fluidMl, supplementsGiven, clinicalNote: note } }, {
+    createIntake.mutate({ data: { residentId: resident.id, mealType: mealType ?? undefined, mealPercent, fluidMl, supplementsGiven, clinicalNote: note, recordedAt: buildRecordedAt(selectedDate, selectedHour) } }, {
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
@@ -737,6 +790,34 @@ function IntakeForm({ resident, onBack }: { resident: Resident; onBack: () => vo
   return (
     <FormShell resident={resident} title="Meal & Fluid Intake" onBack={onBack}
       onReset={handleReset} onSave={handleSave} hasData={hasData} isSaving={createIntake.isPending}>
+      <section className="space-y-3">
+        <SectionLabel>Date &amp; Time of Meal</SectionLabel>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-center text-muted-foreground uppercase tracking-wider">Date</p>
+            <ScrollPicker items={DATE_ITEMS} value={selectedDate} onChange={(v) => setSelectedDate(v as string)} />
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-center text-muted-foreground uppercase tracking-wider">Time</p>
+            <ScrollPicker items={HOUR_ITEMS} value={selectedHour} onChange={(v) => setSelectedHour(v as number)} />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <SectionLabel>Meal Type (optional)</SectionLabel>
+        <div className="grid grid-cols-2 gap-3">
+          {MEAL_TYPES.map((mt) => (
+            <button key={mt.value} onClick={() => setMealType(mealType === mt.value ? null : mt.value)}
+              className={["min-h-[72px] rounded-xl font-bold text-xl border-2 transition-all flex flex-col items-center justify-center gap-1",
+                mealType === mt.value ? [mt.color, "scale-[1.03] shadow-lg"].join(" ") : "bg-card border-border text-foreground hover:border-amber-500/50"].join(" ")}>
+              <span>{mt.icon}</span>
+              <span>{mt.value}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <section className="space-y-3">
         <SectionLabel>Meal Consumed</SectionLabel>
         <div className="grid grid-cols-5 gap-3">
@@ -797,6 +878,8 @@ function FallsForm({ resident, onBack }: { resident: Resident; onBack: () => voi
   const [witnessed, setWitnessed] = useState<boolean | null>(null);
   const [injury, setInjury] = useState<boolean | null>(null);
   const [neuroStarted, setNeuroStarted] = useState<boolean | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr);
+  const [selectedHour, setSelectedHour] = useState<number>(getCurrentHour);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -811,13 +894,16 @@ function FallsForm({ resident, onBack }: { resident: Resident; onBack: () => voi
   }, [witnessed, injury, neuroStarted]);
 
   const hasData = witnessed !== null || injury !== null || neuroStarted !== null;
-  const handleReset = () => { setWitnessed(null); setInjury(null); setNeuroStarted(null); };
+  const handleReset = () => {
+    setWitnessed(null); setInjury(null); setNeuroStarted(null);
+    setSelectedDate(getTodayDateStr()); setSelectedHour(getCurrentHour());
+  };
 
   const handleSave = () => {
     if (witnessed === null || injury === null || neuroStarted === null) {
       toast({ title: "Incomplete entry", description: "Answer all three questions.", variant: "destructive" }); return;
     }
-    createFall.mutate({ data: { residentId: resident.id, isWitnessed: witnessed, apparentInjury: injury, neuroVitalsStarted: neuroStarted, clinicalNote: note } }, {
+    createFall.mutate({ data: { residentId: resident.id, isWitnessed: witnessed, apparentInjury: injury, neuroVitalsStarted: neuroStarted, clinicalNote: note, recordedAt: buildRecordedAt(selectedDate, selectedHour) } }, {
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
@@ -849,6 +935,20 @@ function FallsForm({ resident, onBack }: { resident: Resident; onBack: () => voi
           <p className="text-red-400/80 text-sm">Complete all fields immediately. Notify charge nurse.</p>
         </div>
       </div>
+
+      <section className="space-y-3">
+        <p className="text-xs font-bold text-red-400 uppercase tracking-widest">Date &amp; Time of Fall</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-center text-red-400/70 uppercase tracking-wider">Date</p>
+            <ScrollPicker items={DATE_ITEMS} value={selectedDate} onChange={(v) => setSelectedDate(v as string)} />
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-center text-red-400/70 uppercase tracking-wider">Time</p>
+            <ScrollPicker items={HOUR_ITEMS} value={selectedHour} onChange={(v) => setSelectedHour(v as number)} />
+          </div>
+        </div>
+      </section>
 
       <div className="space-y-6">
         <YesNoToggle label="Was the fall witnessed?" value={witnessed} onChange={setWitnessed} />

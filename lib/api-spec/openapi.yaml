@@ -325,6 +325,9 @@ components:
           type: boolean
         clinicalNote:
           type: string
+        recordedAt:
+          type: string
+          format: date-time
 
     PainEvent:
       type: object
@@ -366,6 +369,9 @@ components:
           type: integer
         clinicalNote:
           type: string
+        recordedAt:
+          type: string
+          format: date-time
 
     BehaviorEvent:
       type: object
@@ -397,6 +403,9 @@ components:
           type: integer
         staffId:
           type: string
+        mealType:
+          type: string
+          enum: [Breakfast, Lunch, Dinner, Snack]
         mealPercent:
           type: integer
           enum: [0, 25, 50, 75, 100]
@@ -406,6 +415,9 @@ components:
           type: boolean
         clinicalNote:
           type: string
+        recordedAt:
+          type: string
+          format: date-time
 
     IntakeEvent:
       type: object
@@ -416,6 +428,8 @@ components:
         residentId:
           type: integer
         staffId:
+          type: ["string", "null"]
+        mealType:
           type: ["string", "null"]
         mealPercent:
           type: integer
@@ -445,6 +459,9 @@ components:
           type: boolean
         clinicalNote:
           type: string
+        recordedAt:
+          type: string
+          format: date-time
 
     FallEvent:
       type: object

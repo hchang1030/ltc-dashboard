@@ -13,7 +13,13 @@ router.post("/fall-events", async (req, res): Promise<void> => {
     return;
   }
 
-  const [row] = await db.insert(fallEventsTable).values(parsed.data).returning();
+  const { recordedAt, ...data } = parsed.data;
+
+  const [row] = await db
+    .insert(fallEventsTable)
+    .values({ ...data, ...(recordedAt ? { createdAt: new Date(recordedAt) } : {}) })
+    .returning();
+
   req.log.info({ id: row.id, residentId: row.residentId, apparentInjury: row.apparentInjury }, "Fall event recorded");
   res.status(201).json(row);
 });

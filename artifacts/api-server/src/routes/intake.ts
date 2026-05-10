@@ -13,8 +13,14 @@ router.post("/intake-events", async (req, res): Promise<void> => {
     return;
   }
 
-  const [row] = await db.insert(intakeEventsTable).values(parsed.data).returning();
-  req.log.info({ id: row.id, residentId: row.residentId, mealPercent: row.mealPercent }, "Intake event recorded");
+  const { recordedAt, ...data } = parsed.data;
+
+  const [row] = await db
+    .insert(intakeEventsTable)
+    .values({ ...data, ...(recordedAt ? { createdAt: new Date(recordedAt) } : {}) })
+    .returning();
+
+  req.log.info({ id: row.id, residentId: row.residentId, mealType: row.mealType, mealPercent: row.mealPercent }, "Intake event recorded");
   res.status(201).json(row);
 });
 

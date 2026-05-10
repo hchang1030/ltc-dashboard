@@ -15,4 +15,5 @@ export interface PainEventInput {
   location: PainEventInputLocation;
   prnGiven?: boolean;
   clinicalNote: string;
+  recordedAt?: Date;
 }
