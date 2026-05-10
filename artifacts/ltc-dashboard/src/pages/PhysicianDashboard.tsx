@@ -23,6 +23,8 @@ import {
   getListOrderTemplatesQueryKey,
   getListResidentOrdersQueryKey,
   useUpdateResidentDemographics,
+  useListMedicationTrackers,
+  getListMedicationTrackersQueryKey,
 } from "@workspace/api-client-react";
 import type { ResidentAlertSummary, BinderEntry, ContactDirectoryEntry, CommunicationLog, OrderTemplate } from "@workspace/api-client-react";
 import {
@@ -178,31 +180,20 @@ function DrillPanel({ resident, onClose, onOpenOverlay }: DrillPanelProps) {
   const [formSdmPhone, setFormSdmPhone] = useState("");
   const [allergyInput, setAllergyInput] = useState("");
   const [flagInput, setFlagInput] = useState("");
-  const [cpoeDraft, setCpoeDraft] = useState<string[]>([]);
-  const [cpoeCustom, setCpoeCustom] = useState("");
+  const [noteSearch, setNoteSearch] = useState("");
+  const [noteTypeFilter, setNoteTypeFilter] = useState<"all" | "md" | "rn" | "allied">("all");
 
   const queryClient = useQueryClient();
   const { mutate: saveDemographics, isPending: isSaving } = useUpdateResidentDemographics();
-  const { toast: panelToast } = useToast();
-  const { data: cpoeTemplates = [] } = useListOrderTemplates(undefined, {
-    query: { queryKey: getListOrderTemplatesQueryKey() },
-  });
-  const signCpoe = useSignResidentOrder();
-
-  const handleCpoeSign = useCallback(() => {
-    if (!resident || cpoeDraft.length === 0) return;
-    signCpoe.mutate(
-      { data: { residentId: resident.residentId, orderText: cpoeDraft.join("\n") } },
-      {
-        onSuccess: async () => {
-          try { await navigator.clipboard.writeText(cpoeDraft.join("\n")); } catch { /* clipboard may be unavailable */ }
-          setCpoeDraft([]);
-          panelToast({ title: "Order Signed & Transmitted", description: `Order faxed for ${resident.name}. Note copied to clipboard.` });
-        },
-        onError: () => panelToast({ title: "Transmission Failed", description: "Could not sign the order.", variant: "destructive" }),
-      },
-    );
-  }, [resident, cpoeDraft, signCpoe, panelToast]);
+  const taperResId = resident?.residentId ?? 0;
+  const { data: allTapers = [] } = useListMedicationTrackers(
+    { residentId: taperResId },
+    { query: { enabled: isOpen, queryKey: getListMedicationTrackersQueryKey({ residentId: taperResId }) } },
+  );
+  const currentTapers = useMemo(
+    () => allTapers.filter((t) => t.status === "Ordered" || t.status === "Active Taper"),
+    [allTapers],
+  );
 
   const openEdit = useCallback(() => {
     setFormCodeStatus(resident?.codeStatus ?? "");
@@ -649,80 +640,43 @@ function DrillPanel({ resident, onClose, onOpenOverlay }: DrillPanelProps) {
               );
             })()}
 
-            {/* ── CPOE Quick-Order ───────────────────────────────── */}
+            {/* ── Active Tapers ──────────────────────────────────── */}
+            {resident && currentTapers.length > 0 && (
+              <section className="space-y-2.5">
+                <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 flex items-center gap-1.5">
+                  💊 Active Tapers
+                </h3>
+                <div className="space-y-2">
+                  {currentTapers.map((taper) => (
+                    <div key={taper.id} className={["rounded-xl border px-3 py-2.5", taper.status === "Active Taper" ? "bg-green-950/30 border-green-700/40" : "bg-indigo-950/30 border-indigo-700/40"].join(" ")}>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">{taper.medicationName}</p>
+                        <span className={["text-xs font-bold px-2 py-0.5 rounded-full border", taper.status === "Active Taper" ? "bg-green-900/60 text-green-300 border-green-700/50" : "bg-indigo-900/60 text-indigo-300 border-indigo-700/50"].join(" ")}>
+                          {taper.status === "Active Taper" ? "✓ Active" : "Awaiting Start"}
+                        </span>
+                      </div>
+                      {taper.dosageInstructions && <p className="text-xs text-muted-foreground mt-1">{taper.dosageInstructions}</p>}
+                      {taper.startDate && (
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">
+                          Started: {new Date(taper.startDate).toLocaleDateString()}{taper.reviewDueDate && ` · Review: ${new Date(taper.reviewDueDate).toLocaleDateString()}`}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── CPOE — Full Order Entry ─────────────────────────── */}
             {resident && (
               <section className="space-y-3 pb-2">
                 <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 flex items-center gap-1.5">
-                  <Stethoscope className="w-3 h-3" /> CPOE Quick-Order
+                  <Stethoscope className="w-3 h-3" /> CPOE — Order Entry
                 </h3>
-
-                {/* Favorite templates */}
-                {cpoeTemplates.filter((t) => t.isFavorited).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {cpoeTemplates.filter((t) => t.isFavorited).slice(0, 6).map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => {
-                          try {
-                            const lines = JSON.parse(t.contentJson) as string[];
-                            setCpoeDraft((prev) => [...prev, ...lines.filter(Boolean)]);
-                          } catch {
-                            setCpoeDraft((prev) => [...prev, t.title]);
-                          }
-                        }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-950/40 border border-violet-500/30 text-violet-300 text-xs font-semibold hover:bg-violet-900/40 transition-colors"
-                      >
-                        <Plus className="w-3 h-3 shrink-0" />{t.title}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Custom free-text */}
-                <div className="flex gap-2">
-                  <input
-                    value={cpoeCustom}
-                    onChange={(e) => setCpoeCustom(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && cpoeCustom.trim()) {
-                        setCpoeDraft((prev) => [...prev, cpoeCustom.trim()]);
-                        setCpoeCustom("");
-                      }
-                    }}
-                    placeholder="Type custom order, press Enter…"
-                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/40"
-                  />
-                  <button
-                    onClick={() => { if (cpoeCustom.trim()) { setCpoeDraft((prev) => [...prev, cpoeCustom.trim()]); setCpoeCustom(""); } }}
-                    className="px-3 py-2 rounded-lg bg-violet-900/40 border border-violet-500/30 text-violet-300 hover:bg-violet-800/40 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Draft */}
-                {cpoeDraft.length > 0 && (
-                  <div className="rounded-xl border border-violet-500/20 bg-violet-950/20 divide-y divide-violet-500/10">
-                    {cpoeDraft.map((line, i) => (
-                      <div key={i} className="flex items-center gap-2 px-3 py-2">
-                        <span className="flex-1 text-xs text-foreground">{line}</span>
-                        <button onClick={() => setCpoeDraft((prev) => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-400 transition-colors shrink-0">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Sign button */}
-                <button
-                  onClick={handleCpoeSign}
-                  disabled={cpoeDraft.length === 0 || signCpoe.isPending}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all"
-                >
-                  {signCpoe.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  Sign &amp; Transmit {cpoeDraft.length > 0 ? `(${cpoeDraft.length})` : ""}
-                </button>
+                <OrderHub
+                  lockedResident={{ id: resident.residentId, name: resident.name, room: resident.room ?? "" }}
+                  compact
+                />
               </section>
             )}
           </div>
@@ -730,8 +684,35 @@ function DrillPanel({ resident, onClose, onOpenOverlay }: DrillPanelProps) {
         ) : (
           /* ── Notes Tab ────────────────────────────────────── */
           <>
+            <div className="px-5 pt-4 pb-2 space-y-2 shrink-0 border-b border-border/50">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <input
+                  value={noteSearch}
+                  onChange={(e) => setNoteSearch(e.target.value)}
+                  placeholder="Search notes by author or content..."
+                  className="w-full bg-muted/30 border border-border rounded-lg pl-8 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="flex gap-1.5 pb-1">
+                {(["all", "md", "rn", "allied"] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setNoteTypeFilter(type)}
+                    className={["px-2.5 py-1 rounded-lg text-xs font-bold border transition-all", noteTypeFilter === type ? "bg-primary/15 border-primary text-primary" : "border-border text-muted-foreground hover:border-primary/40"].join(" ")}
+                  >
+                    {type === "all" ? "All" : type === "md" ? "MD" : type === "rn" ? "RN" : "Allied Health"}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-              {mockNotes.map((note) => (
+              {mockNotes.filter((n) => {
+                const matchType = noteTypeFilter === "all" || n.roleType === noteTypeFilter;
+                const q = noteSearch.trim().toLowerCase();
+                const matchSearch = !q || n.text.toLowerCase().includes(q) || n.author.toLowerCase().includes(q) || n.role.toLowerCase().includes(q);
+                return matchType && matchSearch;
+              }).map((note) => (
                 <div
                   key={note.id}
                   className={[
@@ -850,7 +831,7 @@ function MethodIcon({ method, className }: { method: CommMethod; className?: str
   return <Smartphone className={cls} />;
 }
 
-function CommHubView() {
+export function CommHubView() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -1619,12 +1600,13 @@ function BinderCard({
 }
 
 function VirtualBinder() {
-  const [binderTab, setBinderTab] = useState<"Active" | "Resolved">("Active");
+  const [binderTab, setBinderTab] = useState<"Active" | "FamilyQA" | "Resolved">("Active");
   const queryClient = useQueryClient();
 
+  const binderStatus = binderTab === "FamilyQA" ? ("Active" as const) : binderTab;
   const { data: entries = [], isLoading, refetch, isFetching } = useListBinderEntries(
-    { status: binderTab },
-    { query: { queryKey: getListBinderEntriesQueryKey({ status: binderTab }), refetchInterval: 30_000 } },
+    { status: binderStatus },
+    { query: { enabled: binderTab !== "FamilyQA", queryKey: getListBinderEntriesQueryKey({ status: binderStatus }), refetchInterval: 30_000 } },
   );
 
   const resolve = useResolveBinderEntry();
@@ -1663,6 +1645,18 @@ function VirtualBinder() {
           Active Issues
         </button>
         <button
+          onClick={() => setBinderTab("FamilyQA")}
+          className={[
+            "flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
+            binderTab === "FamilyQA"
+              ? "bg-rose-700/20 border-rose-500 text-rose-300 shadow-md"
+              : "bg-card border-border text-muted-foreground hover:border-rose-500/40",
+          ].join(" ")}
+        >
+          <MessageCircle className="w-4 h-4" />
+          Family Q&amp;A
+        </button>
+        <button
           onClick={() => setBinderTab("Resolved")}
           className={[
             "flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
@@ -1672,59 +1666,65 @@ function VirtualBinder() {
           ].join(" ")}
         >
           <CheckCircle2 className="w-4 h-4" />
-          Resolved Issues
+          Resolved
         </button>
       </div>
 
-      {/* Refresh row */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-          {binderTab === "Active" ? "Active messages awaiting physician review" : "Resolved — crossed off the binder"}
-        </h2>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors text-xs disabled:opacity-50"
-        >
-          <RefreshCw className={["w-3.5 h-3.5", isFetching ? "animate-spin" : ""].join(" ")} />
-          Refresh
-        </button>
-      </div>
-
-      {/* List */}
-      {isLoading && (
-        <div className="text-center py-12 text-muted-foreground">Loading binder entries...</div>
-      )}
-
-      {!isLoading && entries.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3 text-center bg-card border border-border rounded-xl">
-          <div className="bg-muted/40 p-5 rounded-full">
-            {binderTab === "Active"
-              ? <Megaphone className="w-8 h-8 text-muted-foreground/50" />
-              : <CheckCircle2 className="w-8 h-8 text-muted-foreground/50" />}
+      {binderTab === "FamilyQA" ? (
+        <FamilyQAView />
+      ) : (
+        <>
+          {/* Refresh row */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              {binderTab === "Active" ? "Active messages awaiting physician review" : "Resolved — crossed off the binder"}
+            </h2>
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors text-xs disabled:opacity-50"
+            >
+              <RefreshCw className={["w-3.5 h-3.5", isFetching ? "animate-spin" : ""].join(" ")} />
+              Refresh
+            </button>
           </div>
-          <p className="text-muted-foreground font-medium">
-            {binderTab === "Active" ? "No active messages" : "No resolved messages"}
-          </p>
-          <p className="text-muted-foreground/60 text-sm">
-            {binderTab === "Active"
-              ? "Care aides can send messages from the resident module hub."
-              : "Resolved messages will appear here."}
-          </p>
-        </div>
-      )}
 
-      <div className="space-y-3">
-        {entries.map((entry) => (
-          <BinderCard
-            key={entry.id}
-            entry={entry}
-            onResolve={binderTab === "Active" ? () => handleResolve(entry.id) : undefined}
-            onUndo={binderTab === "Resolved" ? () => handleUndo(entry.id) : undefined}
-            isPending={resolve.isPending || undo.isPending}
-          />
-        ))}
-      </div>
+          {/* List */}
+          {isLoading && (
+            <div className="text-center py-12 text-muted-foreground">Loading binder entries...</div>
+          )}
+
+          {!isLoading && entries.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center bg-card border border-border rounded-xl">
+              <div className="bg-muted/40 p-5 rounded-full">
+                {binderTab === "Active"
+                  ? <Megaphone className="w-8 h-8 text-muted-foreground/50" />
+                  : <CheckCircle2 className="w-8 h-8 text-muted-foreground/50" />}
+              </div>
+              <p className="text-muted-foreground font-medium">
+                {binderTab === "Active" ? "No active messages" : "No resolved messages"}
+              </p>
+              <p className="text-muted-foreground/60 text-sm">
+                {binderTab === "Active"
+                  ? "Care aides can send messages from the resident module hub."
+                  : "Resolved messages will appear here."}
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {entries.map((entry) => (
+              <BinderCard
+                key={entry.id}
+                entry={entry}
+                onResolve={binderTab === "Active" ? () => handleResolve(entry.id) : undefined}
+                onUndo={binderTab === "Resolved" ? () => handleUndo(entry.id) : undefined}
+                isPending={resolve.isPending || undo.isPending}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -1799,15 +1799,18 @@ function TemplateAccordion({
   );
 }
 
-function OrderHub() {
+function OrderHub({ lockedResident, compact }: {
+  lockedResident?: { id: number; name: string; room: string };
+  compact?: boolean;
+} = {}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [residentQuery, setResidentQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedResidentId, setSelectedResidentId] = useState<number | null>(null);
-  const [selectedResidentName, setSelectedResidentName] = useState("");
-  const [selectedResidentRoom, setSelectedResidentRoom] = useState("");
+  const [selectedResidentId, setSelectedResidentId] = useState<number | null>(lockedResident?.id ?? null);
+  const [selectedResidentName, setSelectedResidentName] = useState(lockedResident?.name ?? "");
+  const [selectedResidentRoom, setSelectedResidentRoom] = useState(lockedResident?.room ?? "");
   const [draftLines, setDraftLines] = useState<string[]>([]);
   const [customOrder, setCustomOrder] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -1896,65 +1899,69 @@ function OrderHub() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="bg-violet-500/15 p-2.5 rounded-xl">
-          <Stethoscope className="w-5 h-5 text-violet-400" />
+      {!compact && (
+        <div className="flex items-center gap-3">
+          <div className="bg-violet-500/15 p-2.5 rounded-xl">
+            <Stethoscope className="w-5 h-5 text-violet-400" />
+          </div>
+          <div>
+            <h2 className="font-bold text-lg text-foreground">CPOE — Computerized Provider Order Entry</h2>
+            <p className="text-xs text-muted-foreground">Select a resident, build an order from templates or free text, then sign &amp; transmit.</p>
+          </div>
         </div>
-        <div>
-          <h2 className="font-bold text-lg text-foreground">CPOE — Computerized Provider Order Entry</h2>
-          <p className="text-xs text-muted-foreground">Select a resident, build an order from templates or free text, then sign &amp; transmit.</p>
-        </div>
-      </div>
+      )}
 
       {/* Resident Picker */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Patient</p>
-        {selectedResidentId !== null ? (
-          <div className="flex items-center gap-3">
-            <div className="flex-1 flex items-center gap-3 bg-violet-500/10 border border-violet-500/30 rounded-xl px-4 py-3">
-              <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
-                <span className="text-violet-400 font-bold text-xs">{selectedResidentName.slice(0, 2).toUpperCase()}</span>
+      {!lockedResident && (
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Patient</p>
+          {selectedResidentId !== null ? (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 flex items-center gap-3 bg-violet-500/10 border border-violet-500/30 rounded-xl px-4 py-3">
+                <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+                  <span className="text-violet-400 font-bold text-xs">{selectedResidentName.slice(0, 2).toUpperCase()}</span>
+                </div>
+                <div>
+                  <p className="font-bold text-foreground text-sm">{selectedResidentName}</p>
+                  <p className="text-xs text-muted-foreground font-mono">Room {selectedResidentRoom}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-bold text-foreground text-sm">{selectedResidentName}</p>
-                <p className="text-xs text-muted-foreground font-mono">Room {selectedResidentRoom}</p>
-              </div>
+              <button
+                onClick={() => { setSelectedResidentId(null); setSelectedResidentName(""); setSelectedResidentRoom(""); setDraftLines([]); }}
+                className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                title="Clear selection"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              onClick={() => { setSelectedResidentId(null); setSelectedResidentName(""); setSelectedResidentRoom(""); setDraftLines([]); }}
-              className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title="Clear selection"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <div className="relative">
-            <input
-              value={residentQuery}
-              onChange={(e) => { setResidentQuery(e.target.value); setShowDropdown(true); }}
-              onFocus={() => { if (residentQuery) setShowDropdown(true); }}
-              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-              placeholder="Search by name or room number…"
-              className="w-full bg-muted border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/50"
-            />
-            {showDropdown && filteredResidents.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-xl z-30 overflow-hidden">
-                {filteredResidents.map((r) => (
-                  <button
-                    key={r.id}
-                    onMouseDown={() => handleSelectResident(r.id, r.name, r.room)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted text-left transition-colors"
-                  >
-                    <span className="font-medium text-sm text-foreground">{r.name}</span>
-                    <span className="text-xs text-muted-foreground font-mono">Room {r.room}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="relative">
+              <input
+                value={residentQuery}
+                onChange={(e) => { setResidentQuery(e.target.value); setShowDropdown(true); }}
+                onFocus={() => { if (residentQuery) setShowDropdown(true); }}
+                onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                placeholder="Search by name or room number…"
+                className="w-full bg-muted border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/50"
+              />
+              {showDropdown && filteredResidents.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-xl z-30 overflow-hidden">
+                  {filteredResidents.map((r) => (
+                    <button
+                      key={r.id}
+                      onMouseDown={() => handleSelectResident(r.id, r.name, r.room)}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted text-left transition-colors"
+                    >
+                      <span className="font-medium text-sm text-foreground">{r.name}</span>
+                      <span className="text-xs text-muted-foreground font-mono">Room {r.room}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Two-column layout */}
       <div className="grid grid-cols-2 gap-5">
@@ -2659,7 +2666,7 @@ export function FrontlineCommBinder() {
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
   const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
-  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual" | "familyqa">("population");
+  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual">("population");
   const [overlayResident, setOverlayResident] = useState<ResidentAlertSummary | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -2847,18 +2854,6 @@ export default function PhysicianDashboard() {
             <Video className="w-4 h-4" />
             Virtual Health
           </button>
-          <button
-            onClick={() => setView("familyqa")}
-            className={[
-              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
-              view === "familyqa"
-                ? "bg-rose-700/20 border-rose-500 text-rose-300 shadow-sm"
-                : "bg-card border-border text-muted-foreground hover:border-rose-500/40",
-            ].join(" ")}
-          >
-            <MessageCircle className="w-4 h-4" />
-            Family Q&amp;A
-          </button>
         </div>
       </div>
 
@@ -2869,7 +2864,7 @@ export default function PhysicianDashboard() {
         {view === "nlq" && data && <NLQView residents={data.residents} />}
         {view === "qi" && data && <QIView residents={data.residents} />}
         {view === "virtual" && <VirtualHealthView />}
-        {view === "familyqa" && <FamilyQAView />}
+
 
         {/* Resident Summary Table */}
         {view === "population" && <section className="space-y-3">
@@ -3037,36 +3032,6 @@ export default function PhysicianDashboard() {
           )}
         </section>}
 
-        {/* Monthly Facility Stats */}
-        {view === "population" && data && (
-          <section className="space-y-3">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Facility Statistics — {monthName} {time.getFullYear()}
-            </h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card border-2 border-amber-500/30 rounded-xl p-6 flex items-center gap-5" data-testid="stat-monthly-gaps">
-                <div className="bg-amber-500/15 p-4 rounded-full">
-                  <CalendarX className="w-7 h-7 text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-4xl font-bold text-amber-400">{data.facilityMonthlyGaps}</p>
-                  <p className="text-sm text-muted-foreground font-medium mt-1">48-hour gaps this month</p>
-                  <p className="text-xs text-muted-foreground/70 mt-0.5">Intervals between BMs exceeding 48 hours</p>
-                </div>
-              </div>
-              <div className="bg-card border-2 border-red-600/30 rounded-xl p-6 flex items-center gap-5" data-testid="stat-monthly-blood">
-                <div className="bg-red-600/15 p-4 rounded-full">
-                  <Droplets className="w-7 h-7 text-red-500" />
-                </div>
-                <div>
-                  <p className="text-4xl font-bold text-red-500">{data.facilityMonthlyBlood}</p>
-                  <p className="text-sm text-muted-foreground font-medium mt-1">Blood present events this month</p>
-                  <p className="text-xs text-muted-foreground/70 mt-0.5">Facility-wide across all residents</p>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
       </main>
 
       {/* Drill-down panel */}

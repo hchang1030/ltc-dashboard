@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Clock, Star, ChevronRight, ArrowLeft, Search, X,
   Droplets, Zap, Brain, Utensils, AlertOctagon, Activity, Megaphone,
-  FileText, MessageCircle,
+  FileText, MessageCircle, Send, BookOpen,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PatientOverlay } from "@/components/PatientOverlay";
 import type { OverlayResident } from "@/components/PatientOverlay";
-import { FrontlineCommBinder } from "./PhysicianDashboard";
+import { FrontlineCommBinder, CommHubView } from "./PhysicianDashboard";
+import { getMockPRNLaxCount, getMockPRNAntipsychoticCount, getMockFalls } from "@/data/mockData";
 import {
   useListResidents,
   useToggleFavorite,
@@ -225,6 +226,7 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
   const [search, setSearch] = useState("");
   const [time, setTime] = useState(new Date());
   const [showBinder, setShowBinder] = useState(false);
+  const [showCommHub, setShowCommHub] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: residents = [], isLoading } = useListResidents();
@@ -292,24 +294,44 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
         </div>
       )}
 
+      {showCommHub && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card sticky top-0 z-10">
+            <button onClick={() => setShowCommHub(false)}
+              className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Back to Residents
+            </button>
+          </div>
+          <CommHubView />
+        </div>
+      )}
+
       <div className="sticky top-[61px] z-20 bg-background border-b border-border px-6 py-3 space-y-3 shrink-0">
         <div className="flex gap-2">
-          <button onClick={() => { setFilter("all"); setShowBinder(false); }}
+          <button onClick={() => { setFilter("all"); setShowBinder(false); setShowCommHub(false); }}
             className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all",
-              !showBinder && filter === "all" ? "bg-primary border-primary text-primary-foreground shadow-md" : "bg-card border-border text-muted-foreground hover:border-primary/40"].join(" ")}>
+              !showBinder && !showCommHub && filter === "all" ? "bg-primary border-primary text-primary-foreground shadow-md" : "bg-card border-border text-muted-foreground hover:border-primary/40"].join(" ")}>
             All Residents ({residents.length})
           </button>
-          <button onClick={() => { setFilter("favorites"); setShowBinder(false); }}
+          <button onClick={() => { setFilter("favorites"); setShowBinder(false); setShowCommHub(false); }}
             className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
-              !showBinder && filter === "favorites" ? "bg-amber-500 border-amber-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-amber-500/40"].join(" ")}>
-            <Star className={[!showBinder && filter === "favorites" ? "fill-white" : "", "w-4 h-4"].join(" ")} />
+              !showBinder && !showCommHub && filter === "favorites" ? "bg-amber-500 border-amber-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-amber-500/40"].join(" ")}>
+            <Star className={[!showBinder && !showCommHub && filter === "favorites" ? "fill-white" : "", "w-4 h-4"].join(" ")} />
             My Patients ({favCount})
           </button>
-          <button onClick={() => setShowBinder(true)}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => { setShowBinder(true); setShowCommHub(false); }}
             className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
               showBinder ? "bg-sky-600 border-sky-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-sky-500/40"].join(" ")}>
             <MessageCircle className="w-4 h-4" />
             Family Binder
+          </button>
+          <button onClick={() => { setShowBinder(false); setShowCommHub(true); }}
+            className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
+              showCommHub ? "bg-violet-600 border-violet-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-violet-500/40"].join(" ")}>
+            <Send className="w-4 h-4" />
+            Comm Hub
           </button>
         </div>
         <div className="relative">
@@ -376,6 +398,9 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
   const queryClient = useQueryClient();
   const [staffName, setStaffName] = useState("Frontline Staff");
   const [overlayRes, setOverlayRes] = useState<OverlayResident | null>(null);
+  const [showProgressNote, setShowProgressNote] = useState(false);
+  const [progressNote, setProgressNote] = useState("");
+  const createBinder = useCreateBinderEntry();
 
   const { data: allTapers = [] } = useListMedicationTrackers(
     { residentId: resident.id },
@@ -416,6 +441,13 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
           <p className="text-xs text-muted-foreground mt-0.5">Room {resident.room} — Select a care module</p>
         </div>
         <button
+          onClick={() => setShowProgressNote(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-colors text-xs font-bold shrink-0"
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          Progress Note
+        </button>
+        <button
           onClick={() => setOverlayRes({
             residentId: resident.id,
             name: resident.name,
@@ -431,6 +463,106 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
       </header>
 
       <PatientOverlay resident={overlayRes} onClose={() => setOverlayRes(null)} />
+
+      {/* Progress Note Sidebar */}
+      {showProgressNote && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowProgressNote(false)} />
+          <div className="fixed inset-y-0 right-0 w-full max-w-sm z-50 bg-card border-l border-border shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+              <p className="font-bold text-sm text-foreground">Progress Note — {resident.name}</p>
+              <button onClick={() => setShowProgressNote(false)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex items-center gap-3 bg-muted/30 rounded-xl p-3">
+                <img src={`https://i.pravatar.cc/60?img=${((resident.id - 6) % 70) + 1}`} className="w-12 h-12 rounded-full shrink-0 ring-2 ring-border" alt="" />
+                <div>
+                  <p className="font-bold text-foreground">{resident.name}</p>
+                  <p className="text-xs text-muted-foreground">Room {resident.room}</p>
+                </div>
+              </div>
+              {(() => {
+                const falls = getMockFalls(resident.id);
+                const prnLax = getMockPRNLaxCount(resident.id);
+                const prnAP = getMockPRNAntipsychoticCount(resident.id);
+                return (
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Clinical Overview</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className={["rounded-xl border px-3 py-2", falls.length > 0 ? "bg-red-950/40 border-red-500/40" : "bg-background/50 border-border"].join(" ")}>
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Falls (1yr)</p>
+                        <p className={["text-sm font-bold", falls.length > 0 ? "text-red-400" : "text-emerald-400"].join(" ")}>
+                          {falls.length > 0 ? `${falls.length} event${falls.length !== 1 ? "s" : ""}` : "None"}
+                        </p>
+                      </div>
+                      <div className={["rounded-xl border px-3 py-2", prnLax > 2 ? "bg-orange-950/40 border-orange-500/40" : "bg-background/50 border-border"].join(" ")}>
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">PRN Lax (14d)</p>
+                        <p className={["text-sm font-bold", prnLax > 0 ? "text-orange-400" : "text-emerald-400"].join(" ")}>
+                          {prnLax > 0 ? `${prnLax} dose${prnLax !== 1 ? "s" : ""}` : "None"}
+                        </p>
+                      </div>
+                      <div className={["rounded-xl border px-3 py-2 col-span-2", prnAP > 0 ? "bg-purple-950/40 border-purple-500/40" : "bg-background/50 border-border"].join(" ")}>
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">PRN Antipsych (14d)</p>
+                        <p className={["text-sm font-bold", prnAP > 0 ? "text-purple-400" : "text-emerald-400"].join(" ")}>
+                          {prnAP > 0 ? `${prnAP} dose${prnAP !== 1 ? "s" : ""}` : "None"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              {activeTapers.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Active Tapers</p>
+                  {activeTapers.map((taper) => (
+                    <div key={taper.id} className={["rounded-xl border px-3 py-2", taper.status === "Active Taper" ? "bg-green-950/30 border-green-700/40" : "bg-indigo-950/30 border-indigo-700/40"].join(" ")}>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-foreground">{taper.medicationName}</p>
+                        <span className={["text-[10px] font-bold px-1.5 py-0.5 rounded-full", taper.status === "Active Taper" ? "bg-green-900/60 text-green-300" : "bg-indigo-900/60 text-indigo-300"].join(" ")}>
+                          {taper.status === "Active Taper" ? "Active" : "Ordered"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">SBAR Progress Note</p>
+                <textarea
+                  value={progressNote}
+                  onChange={(e) => setProgressNote(e.target.value)}
+                  rows={7}
+                  placeholder={"S: Situation — what is happening now\nB: Background — relevant history\nA: Assessment — clinical judgment\nR: Recommendation — next steps"}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary resize-none leading-relaxed font-mono"
+                />
+              </div>
+            </div>
+            <div className="px-4 py-3 border-t border-border shrink-0">
+              <button
+                onClick={async () => {
+                  if (!progressNote.trim()) return;
+                  try { await navigator.clipboard.writeText(progressNote); } catch { /* blocked */ }
+                  createBinder.mutate({ data: { residentId: resident.id, messageText: `[Progress Note] ${progressNote}` } }, {
+                    onSuccess: () => {
+                      queryClient.invalidateQueries({ queryKey: getListBinderEntriesQueryKey() });
+                      toast({ title: "Note Saved", description: "SBAR note copied to clipboard and sent to binder." });
+                      setProgressNote("");
+                    },
+                    onError: () => toast({ title: "Save failed", variant: "destructive" }),
+                  });
+                }}
+                disabled={!progressNote.trim() || createBinder.isPending}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                <BookOpen className="w-4 h-4" />
+                Save Note &amp; Copy to Clipboard
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       <main className="max-w-3xl mx-auto p-6">
         <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-5">What would you like to log?</p>
@@ -529,25 +661,29 @@ function BowelForm({ resident, onBack }: { resident: Resident; onBack: () => voi
 
   const note = useMemo(() => {
     if (!stoolType && !amount && !Object.values(flags).some(Boolean)) return "Awaiting documentation input...";
-    let n = "";
+    const situationParts: string[] = [];
     if (stoolType && amount) {
       const desc = STOOL_TYPES.find((t) => t.id === stoolType)?.desc.toLowerCase() ?? "";
-      n += `${amount}, Type ${stoolType} bowel movement. ${desc.charAt(0).toUpperCase() + desc.slice(1)}. `;
+      situationParts.push(`Type ${stoolType} BM (${desc}), ${amount} amount`);
     } else if (stoolType) {
-      n += `Type ${stoolType} bowel movement. `;
+      const desc = STOOL_TYPES.find((t) => t.id === stoolType)?.desc.toLowerCase() ?? "";
+      situationParts.push(`Type ${stoolType} BM (${desc})`);
     } else if (amount) {
-      n += `${amount} bowel movement. `;
+      situationParts.push(`${amount} BM`);
     }
-    if (stoolType || amount) n += flags.incontinence ? "Incontinent. " : "Continent. ";
-    const extras: string[] = [];
-    if (flags.blood) extras.push("Blood present");
-    if (flags.mucus) extras.push("Mucus noted");
-    if (flags.pain)  extras.push("Pain/straining observed");
-    if (extras.length) n += extras.join(". ") + ". ";
-    else if (stoolType || amount) n += "No blood, mucus, or pain noted. ";
-    if (flags.blood) n += "Clinical review recommended.";
-    return n.trim();
-  }, [stoolType, amount, flags]);
+    if (flags.incontinence) situationParts.push("incontinent episode");
+    const flagList = [flags.blood && "blood present", flags.mucus && "mucus noted", flags.pain && "pain/straining"].filter(Boolean).join(", ");
+    if (flagList) situationParts.push(flagList);
+    const assessment = flags.blood
+      ? "Blood present — clinically significant. Physician review required."
+      : (stoolType && stoolType <= 2) ? "Hard stool. Laxative protocol review indicated."
+      : (stoolType && stoolType >= 6) ? "Loose/liquid stool. Monitor hydration."
+      : "Stool characteristics within expected range.";
+    const recommendation = flags.blood
+      ? "Notify physician immediately. Monitor for recurrence."
+      : "Continue bowel monitoring per care plan.";
+    return `S: ${situationParts.join("; ") || "Bowel event documented"}.\nB: ${resident.name}, Room ${resident.room}.\nA: ${assessment}\nR: ${recommendation}`;
+  }, [stoolType, amount, flags, resident]);
 
   const hasData = stoolType !== null || amount !== null || Object.values(flags).some(Boolean);
 
@@ -641,9 +777,9 @@ function BowelForm({ resident, onBack }: { resident: Resident; onBack: () => voi
 
       {/* Clinical Note */}
       <section className="space-y-3">
-        <SectionLabel>Generated Clinical Note</SectionLabel>
-        <div className="bg-card border-2 border-border rounded-xl p-5 min-h-[90px] flex items-center shadow-inner">
-          <p className="font-mono text-base text-foreground leading-relaxed w-full">{note}</p>
+        <SectionLabel>SBAR Note</SectionLabel>
+        <div className="bg-card border-2 border-border rounded-xl p-5 min-h-[90px] flex items-start shadow-inner">
+          <p className="font-mono text-base text-foreground leading-relaxed w-full whitespace-pre-wrap">{note}</p>
         </div>
       </section>
     </FormShell>
@@ -665,12 +801,15 @@ function PainForm({ resident, onBack }: { resident: Resident; onBack: () => void
 
   const note = useMemo(() => {
     if (!severity) return "Awaiting documentation input...";
-    let n = `${severity} pain reported.`;
-    if (location) n += ` Location: ${location}.`;
-    n += ` PRN ${prnGiven ? "given" : "not given"}.`;
-    if (severity === "Severe") n += " Physician review recommended.";
-    return n;
-  }, [severity, location, prnGiven]);
+    const loc = location ? ` at ${location}` : "";
+    const assessment = severity === "Severe"
+      ? "Severe pain — clinically significant. Prompt physician review required."
+      : severity === "Moderate"
+      ? "Moderate pain. Monitor closely for escalation."
+      : "Pain within manageable range.";
+    const recommendation = `PRN medication ${prnGiven ? "administered" : "not administered"}. ${severity === "Severe" ? "Notify physician and charge nurse." : "Reassess in 30–60 minutes."}`;
+    return `S: ${severity} pain reported${loc}.\nB: ${resident.name}, Room ${resident.room}.\nA: ${assessment}\nR: ${recommendation}`;
+  }, [severity, location, prnGiven, resident]);
 
   const hasData = !!severity;
 
@@ -747,9 +886,9 @@ function PainForm({ resident, onBack }: { resident: Resident; onBack: () => void
       </section>
 
       <section className="space-y-3">
-        <SectionLabel>Generated Clinical Note</SectionLabel>
+        <SectionLabel>SBAR Note</SectionLabel>
         <div className="bg-card border-2 border-border rounded-xl p-5 min-h-[72px] flex items-center shadow-inner">
-          <p className="font-mono text-base text-foreground leading-relaxed w-full">{note}</p>
+          <p className="font-mono text-base text-foreground leading-relaxed w-full whitespace-pre-wrap">{note}</p>
         </div>
       </section>
     </FormShell>
@@ -771,11 +910,15 @@ function BehaviorForm({ resident, onBack }: { resident: Resident; onBack: () => 
 
   const note = useMemo(() => {
     if (!type) return "Awaiting documentation input...";
-    let n = `${type} behavior observed.`;
-    if (intensity) n += ` Intensity: ${intensity}.`;
-    if (duration) n += ` Duration: approximately ${duration} minutes.`;
-    return n;
-  }, [type, intensity, duration]);
+    const dur = duration ? ` Duration: ~${duration} min.` : "";
+    const assessment = intensity === "High"
+      ? "High-intensity BPSD episode. Risk of escalation."
+      : "Low-intensity behavioral event. Monitor for pattern.";
+    const recommendation = intensity === "High"
+      ? "Notify charge nurse and physician. Implement de-escalation protocol."
+      : "Document in behavior log. Monitor for frequency increase.";
+    return `S: ${type} behavior — ${intensity ?? "unspecified"} intensity.${dur}\nB: ${resident.name}, Room ${resident.room}.\nA: ${assessment}\nR: ${recommendation}`;
+  }, [type, intensity, duration, resident]);
 
   const hasData = !!type;
   const handleReset = () => {
@@ -855,9 +998,9 @@ function BehaviorForm({ resident, onBack }: { resident: Resident; onBack: () => 
       </section>
 
       <section className="space-y-3">
-        <SectionLabel>Generated Clinical Note</SectionLabel>
+        <SectionLabel>SBAR Note</SectionLabel>
         <div className="bg-card border-2 border-border rounded-xl p-5 min-h-[72px] flex items-center shadow-inner">
-          <p className="font-mono text-base text-foreground leading-relaxed w-full">{note}</p>
+          <p className="font-mono text-base text-foreground leading-relaxed w-full whitespace-pre-wrap">{note}</p>
         </div>
       </section>
     </FormShell>
@@ -888,13 +1031,17 @@ function IntakeForm({ resident, onBack }: { resident: Resident; onBack: () => vo
 
   const note = useMemo(() => {
     if (mealPercent === null && fluidMl === 0) return "Awaiting documentation input...";
-    let n = "";
-    if (mealType) n += `${mealType}: `;
-    if (mealPercent !== null) n += `Consumed ${mealPercent}% of meal offering. `;
-    if (fluidMl > 0) n += `Fluid intake: ${fluidMl}mL. `;
-    n += `Supplements: ${supplementsGiven ? "given" : "not given"}.`;
-    return n.trim();
-  }, [mealType, mealPercent, fluidMl, supplementsGiven]);
+    const mealStr = mealType ? `${mealType}: ` : "";
+    const pctStr = mealPercent !== null ? `${mealPercent}% of meal consumed` : "meal % not recorded";
+    const fluidStr = fluidMl > 0 ? `${fluidMl} mL fluid` : "fluid not recorded";
+    const assessment = mealPercent !== null && mealPercent <= 25
+      ? "Significantly reduced intake — nutritional risk. Dietitian referral may be indicated."
+      : mealPercent !== null && mealPercent <= 50
+      ? "Below-target intake. Monitor trend."
+      : "Adequate intake documented.";
+    const recommendation = `Supplements ${supplementsGiven ? "given" : "not given"}. ${mealPercent !== null && mealPercent <= 25 ? "Notify dietitian." : "Continue routine intake monitoring."}`;
+    return `S: ${mealStr}${pctStr}; ${fluidStr}.\nB: ${resident.name}, Room ${resident.room}.\nA: ${assessment}\nR: ${recommendation}`;
+  }, [mealType, mealPercent, fluidMl, supplementsGiven, resident]);
 
   const hasData = mealPercent !== null || fluidMl > 0 || mealType !== null;
   const handleReset = () => {
@@ -999,9 +1146,9 @@ function IntakeForm({ resident, onBack }: { resident: Resident; onBack: () => vo
       </section>
 
       <section className="space-y-3">
-        <SectionLabel>Generated Clinical Note</SectionLabel>
+        <SectionLabel>SBAR Note</SectionLabel>
         <div className="bg-card border-2 border-border rounded-xl p-5 min-h-[72px] flex items-center shadow-inner">
-          <p className="font-mono text-base text-foreground leading-relaxed w-full">{note}</p>
+          <p className="font-mono text-base text-foreground leading-relaxed w-full whitespace-pre-wrap">{note}</p>
         </div>
       </section>
     </FormShell>
@@ -1022,12 +1169,14 @@ function FallsForm({ resident, onBack }: { resident: Resident; onBack: () => voi
   const createFall = useCreateFallEvent();
 
   const note = useMemo(() => {
-    const parts: string[] = ["FALL EVENT RECORDED."];
-    if (witnessed !== null) parts.push(witnessed ? "Witnessed." : "Unwitnessed.");
-    if (injury !== null) parts.push(injury ? "Apparent injury present." : "No apparent injury noted.");
-    if (neuroStarted !== null) parts.push(neuroStarted ? "Neuro vitals initiated." : "Neuro vitals not yet initiated.");
-    return parts.join(" ");
-  }, [witnessed, injury, neuroStarted]);
+    const witnessStr = witnessed !== null ? (witnessed ? "Witnessed" : "Unwitnessed") : "Witness status pending";
+    const injuryStr = injury !== null ? (injury ? "Apparent injury present" : "No apparent injury") : "Injury status pending";
+    const neuroStr = neuroStarted !== null ? (neuroStarted ? "Neuro vitals initiated" : "Neuro vitals not yet initiated") : "Neuro status pending";
+    const assessment = injury
+      ? "Apparent injury — immediate assessment required."
+      : "No apparent injury noted. Continued monitoring essential.";
+    return `S: FALL EVENT. ${witnessStr} fall.\nB: ${resident.name}, Room ${resident.room}. ${injuryStr}. ${neuroStr}.\nA: ${assessment}\nR: Notify physician and charge nurse immediately. Complete incident report. Neuro vitals q1h × 4. Family notification required.`;
+  }, [witnessed, injury, neuroStarted, resident]);
 
   const hasData = witnessed !== null || injury !== null || neuroStarted !== null;
   const handleReset = () => {
@@ -1093,9 +1242,9 @@ function FallsForm({ resident, onBack }: { resident: Resident; onBack: () => voi
       </div>
 
       <section className="space-y-3">
-        <SectionLabel>Generated Clinical Note</SectionLabel>
+        <SectionLabel>SBAR Note</SectionLabel>
         <div className="bg-red-950/40 border-2 border-red-800/50 rounded-xl p-5 min-h-[72px] flex items-center">
-          <p className="font-mono text-base text-red-200 leading-relaxed w-full">{note}</p>
+          <p className="font-mono text-base text-red-200 leading-relaxed w-full whitespace-pre-wrap">{note}</p>
         </div>
       </section>
     </FormShell>
@@ -1140,8 +1289,14 @@ function VitalsForm({ resident, onBack }: { resident: Resident; onBack: () => vo
     if (o2) parts.push(`O2 Sat: ${o2}%`);
     if (weight) parts.push(`Wt: ${weight} lbs`);
     if (!parts.length) return "Awaiting documentation input...";
-    return parts.join(", ") + ". " + (isAbnormalFlag ? "Abnormal values flagged — clinical review recommended." : "All values within expected range.");
-  }, [temp, bpSys, bpDia, hr, o2, weight, isAbnormalFlag]);
+    const assessment = isAbnormalFlag
+      ? "Abnormal values detected — clinical review required."
+      : "All values within expected range.";
+    const recommendation = isAbnormalFlag
+      ? "Notify physician of abnormal findings. Increase monitoring frequency."
+      : "Continue routine vital signs monitoring per care plan.";
+    return `S: Vital signs recorded — ${parts.join(", ")}.\nB: ${resident.name}, Room ${resident.room}.\nA: ${assessment}\nR: ${recommendation}`;
+  }, [temp, bpSys, bpDia, hr, o2, weight, isAbnormalFlag, resident]);
 
   const hasData = !!(temp || bpSys || bpDia || hr || o2 || weight);
   const handleReset = () => { setTemp(""); setBpSys(""); setBpDia(""); setHr(""); setO2(""); setWeight(""); setManualAbnormal(false); };
@@ -1201,9 +1356,9 @@ function VitalsForm({ resident, onBack }: { resident: Resident; onBack: () => vo
       </section>
 
       <section className="space-y-3">
-        <SectionLabel>Generated Clinical Note</SectionLabel>
+        <SectionLabel>SBAR Note</SectionLabel>
         <div className="bg-card border-2 border-border rounded-xl p-5 min-h-[72px] flex items-center shadow-inner">
-          <p className="font-mono text-base text-foreground leading-relaxed w-full">{note}</p>
+          <p className="font-mono text-base text-foreground leading-relaxed w-full whitespace-pre-wrap">{note}</p>
         </div>
       </section>
     </FormShell>
