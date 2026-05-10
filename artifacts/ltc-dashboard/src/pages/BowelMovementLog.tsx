@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Clock, Star, ChevronRight, ArrowLeft, Search, X,
-  Droplets, Zap, Brain, Utensils, AlertOctagon, Activity,
+  Droplets, Zap, Brain, Utensils, AlertOctagon, Activity, Megaphone,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -13,6 +13,8 @@ import {
   useCreateIntakeEvent,
   useCreateFallEvent,
   useCreateVitalEvent,
+  useCreateBinderEntry,
+  getListBinderEntriesQueryKey,
   useGetPhysicianSummary,
   getGetPhysicianSummaryQueryKey,
   getListResidentsQueryKey,
@@ -23,7 +25,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ViewState = "list" | "hub" | "bowel" | "pain" | "behavior" | "intake" | "falls" | "vitals";
+type ViewState = "list" | "hub" | "bowel" | "pain" | "behavior" | "intake" | "falls" | "vitals" | "message";
 type StoolType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | null;
 type Amount = "Small" | "Medium" | "Large" | "XL" | null;
 type ViewFilter = "all" | "favorites";
@@ -338,6 +340,7 @@ const MODULES: {
   { key: "intake",   label: "Intake",   sub: "Meal % + Fluids",    icon: Utensils,     bg: "bg-emerald-950/60",border: "border-emerald-700/50",iconColor: "text-emerald-400" },
   { key: "falls",    label: "Falls",    sub: "EMERGENCY",          icon: AlertOctagon, bg: "bg-red-900/80",    border: "border-red-500/70",    iconColor: "text-red-300" },
   { key: "vitals",   label: "Vitals",   sub: "BP · HR · Temp · O₂",icon: Activity,     bg: "bg-blue-950/60",   border: "border-blue-700/50",   iconColor: "text-blue-400" },
+  { key: "message",  label: "Message MD",sub: "Send to Binder",   icon: Megaphone,    bg: "bg-sky-950/60",    border: "border-sky-700/50",    iconColor: "text-sky-400" },
 ];
 
 function ModuleHub({ resident, onSelectModule, onBack }: {
@@ -1074,6 +1077,77 @@ function VitalsForm({ resident, onBack }: { resident: Resident; onBack: () => vo
   );
 }
 
+// ── ── ── Screen 3g: Message MD Form ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+function MessageForm({ resident, onBack }: { resident: Resident; onBack: () => void }) {
+  const [messageText, setMessageText] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const createBinder = useCreateBinderEntry();
+
+  const handleSend = () => {
+    const trimmed = messageText.trim();
+    if (!trimmed) {
+      toast({ title: "Empty message", description: "Please type a message before sending.", variant: "destructive" });
+      return;
+    }
+    createBinder.mutate({ data: { residentId: resident.id, messageText: trimmed } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListBinderEntriesQueryKey() });
+        toast({ title: "Sent to Binder", description: "Message posted to the Virtual Communication Binder." });
+        setMessageText("");
+        onBack();
+      },
+      onError: () => toast({ title: "Send failed", variant: "destructive" }),
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <header className="sticky top-0 z-30 bg-card border-b border-border px-4 py-3 flex items-center gap-4 shadow-md">
+        <button onClick={onBack} className="flex items-center justify-center w-11 h-11 rounded-full hover:bg-muted transition-colors shrink-0">
+          <ArrowLeft className="w-5 h-5 text-foreground" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-base text-foreground leading-none truncate">{resident.name}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Room {resident.room} — Message MD / Virtual Binder</p>
+        </div>
+        <span className="bg-sky-500/10 text-sky-400 border border-sky-500/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest shrink-0">Binder</span>
+      </header>
+
+      <main className="max-w-2xl mx-auto w-full p-6 space-y-6">
+        <div className="bg-sky-950/40 border-2 border-sky-700/50 rounded-xl p-4 flex items-start gap-3">
+          <Megaphone className="w-6 h-6 text-sky-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-sky-300 text-base">Message to Physician</p>
+            <p className="text-sky-400/70 text-sm mt-0.5">This message will appear in the Virtual Communication Binder visible to the attending physician.</p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Message</p>
+          <textarea
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            rows={6}
+            placeholder="Describe the clinical concern, observation, or question for the physician..."
+            className="w-full bg-card border-2 border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-sky-500/60 text-base resize-none leading-relaxed"
+          />
+          <p className="text-xs text-muted-foreground text-right">{messageText.length} characters</p>
+        </div>
+
+        <button
+          onClick={handleSend}
+          disabled={createBinder.isPending || !messageText.trim()}
+          className="w-full min-h-[72px] rounded-xl font-bold text-xl border-2 border-sky-500 bg-sky-800/50 text-sky-100 hover:bg-sky-700/60 active:scale-[0.98] transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3">
+          <Megaphone className="w-6 h-6" />
+          {createBinder.isPending ? "Sending..." : "SEND TO BINDER"}
+        </button>
+      </main>
+    </div>
+  );
+}
+
 // ── Root Export ───────────────────────────────────────────────────────────────
 
 export default function BowelMovementLog() {
@@ -1093,5 +1167,6 @@ export default function BowelMovementLog() {
   if (view === "intake")   return <IntakeForm resident={resident} onBack={goToHub} />;
   if (view === "falls")    return <FallsForm resident={resident} onBack={goToHub} />;
   if (view === "vitals")   return <VitalsForm resident={resident} onBack={goToHub} />;
+  if (view === "message")  return <MessageForm resident={resident} onBack={goToHub} />;
   return null;
 }

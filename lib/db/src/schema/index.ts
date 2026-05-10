@@ -6,3 +6,4 @@ export * from "./intakeEvents";
 export * from "./fallEvents";
 export * from "./vitalEvents";
 export * from "./billingLogs";
+export * from "./communicationBinder";

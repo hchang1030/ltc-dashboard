@@ -169,6 +169,71 @@ export const CreateVitalEventBody = zod.object({
 });
 
 /**
+ * @summary List communication binder entries
+ */
+export const ListBinderEntriesQueryParams = zod.object({
+  status: zod.enum(["Active", "Resolved"]).optional(),
+});
+
+export const ListBinderEntriesResponseItem = zod.object({
+  id: zod.number(),
+  residentId: zod.number(),
+  residentName: zod.string(),
+  residentRoom: zod.string(),
+  messageText: zod.string(),
+  status: zod.string(),
+  timestamp: zod.coerce.date(),
+  resolvedTimestamp: zod.coerce.date().nullish(),
+});
+export const ListBinderEntriesResponse = zod.array(
+  ListBinderEntriesResponseItem,
+);
+
+/**
+ * @summary Post a message to the communication binder
+ */
+export const CreateBinderEntryBody = zod.object({
+  residentId: zod.number(),
+  messageText: zod.string(),
+});
+
+/**
+ * @summary Mark a binder entry as resolved
+ */
+export const ResolveBinderEntryParams = zod.object({
+  messageId: zod.coerce.number(),
+});
+
+export const ResolveBinderEntryResponse = zod.object({
+  id: zod.number(),
+  residentId: zod.number(),
+  residentName: zod.string(),
+  residentRoom: zod.string(),
+  messageText: zod.string(),
+  status: zod.string(),
+  timestamp: zod.coerce.date(),
+  resolvedTimestamp: zod.coerce.date().nullish(),
+});
+
+/**
+ * @summary Undo resolve — move entry back to Active
+ */
+export const UndoBinderEntryParams = zod.object({
+  messageId: zod.coerce.number(),
+});
+
+export const UndoBinderEntryResponse = zod.object({
+  id: zod.number(),
+  residentId: zod.number(),
+  residentName: zod.string(),
+  residentRoom: zod.string(),
+  messageText: zod.string(),
+  status: zod.string(),
+  timestamp: zod.coerce.date(),
+  resolvedTimestamp: zod.coerce.date().nullish(),
+});
+
+/**
  * @summary Get physician population health summary
  */
 export const GetPhysicianSummaryResponse = zod.object({

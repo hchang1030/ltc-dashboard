@@ -19,6 +19,8 @@ import type {
 import type {
   BehaviorEvent,
   BehaviorEventInput,
+  BinderEntry,
+  BinderEntryInput,
   BowelMovement,
   BowelMovementInput,
   FallEvent,
@@ -27,6 +29,7 @@ import type {
   HealthStatus,
   IntakeEvent,
   IntakeEventInput,
+  ListBinderEntriesParams,
   ListBowelMovementsParams,
   PainEvent,
   PainEventInput,
@@ -893,6 +896,357 @@ export const useCreateVitalEvent = <
   TContext
 > => {
   return useMutation(getCreateVitalEventMutationOptions(options));
+};
+
+/**
+ * @summary List communication binder entries
+ */
+export const getListBinderEntriesUrl = (params?: ListBinderEntriesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/communication-binder?${stringifiedParams}`
+    : `/api/communication-binder`;
+};
+
+export const listBinderEntries = async (
+  params?: ListBinderEntriesParams,
+  options?: RequestInit,
+): Promise<BinderEntry[]> => {
+  return customFetch<BinderEntry[]>(getListBinderEntriesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListBinderEntriesQueryKey = (
+  params?: ListBinderEntriesParams,
+) => {
+  return [`/api/communication-binder`, ...(params ? [params] : [])] as const;
+};
+
+export const getListBinderEntriesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBinderEntries>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListBinderEntriesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBinderEntries>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListBinderEntriesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listBinderEntries>>
+  > = ({ signal }) => listBinderEntries(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBinderEntries>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBinderEntriesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBinderEntries>>
+>;
+export type ListBinderEntriesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List communication binder entries
+ */
+
+export function useListBinderEntries<
+  TData = Awaited<ReturnType<typeof listBinderEntries>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListBinderEntriesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBinderEntries>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBinderEntriesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Post a message to the communication binder
+ */
+export const getCreateBinderEntryUrl = () => {
+  return `/api/communication-binder`;
+};
+
+export const createBinderEntry = async (
+  binderEntryInput: BinderEntryInput,
+  options?: RequestInit,
+): Promise<BinderEntry> => {
+  return customFetch<BinderEntry>(getCreateBinderEntryUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(binderEntryInput),
+  });
+};
+
+export const getCreateBinderEntryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBinderEntry>>,
+    TError,
+    { data: BodyType<BinderEntryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBinderEntry>>,
+  TError,
+  { data: BodyType<BinderEntryInput> },
+  TContext
+> => {
+  const mutationKey = ["createBinderEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBinderEntry>>,
+    { data: BodyType<BinderEntryInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createBinderEntry(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateBinderEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createBinderEntry>>
+>;
+export type CreateBinderEntryMutationBody = BodyType<BinderEntryInput>;
+export type CreateBinderEntryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Post a message to the communication binder
+ */
+export const useCreateBinderEntry = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBinderEntry>>,
+    TError,
+    { data: BodyType<BinderEntryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createBinderEntry>>,
+  TError,
+  { data: BodyType<BinderEntryInput> },
+  TContext
+> => {
+  return useMutation(getCreateBinderEntryMutationOptions(options));
+};
+
+/**
+ * @summary Mark a binder entry as resolved
+ */
+export const getResolveBinderEntryUrl = (messageId: number) => {
+  return `/api/communication-binder/${messageId}/resolve`;
+};
+
+export const resolveBinderEntry = async (
+  messageId: number,
+  options?: RequestInit,
+): Promise<BinderEntry> => {
+  return customFetch<BinderEntry>(getResolveBinderEntryUrl(messageId), {
+    ...options,
+    method: "PATCH",
+  });
+};
+
+export const getResolveBinderEntryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resolveBinderEntry>>,
+    TError,
+    { messageId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resolveBinderEntry>>,
+  TError,
+  { messageId: number },
+  TContext
+> => {
+  const mutationKey = ["resolveBinderEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resolveBinderEntry>>,
+    { messageId: number }
+  > = (props) => {
+    const { messageId } = props ?? {};
+
+    return resolveBinderEntry(messageId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResolveBinderEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resolveBinderEntry>>
+>;
+
+export type ResolveBinderEntryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Mark a binder entry as resolved
+ */
+export const useResolveBinderEntry = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resolveBinderEntry>>,
+    TError,
+    { messageId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resolveBinderEntry>>,
+  TError,
+  { messageId: number },
+  TContext
+> => {
+  return useMutation(getResolveBinderEntryMutationOptions(options));
+};
+
+/**
+ * @summary Undo resolve — move entry back to Active
+ */
+export const getUndoBinderEntryUrl = (messageId: number) => {
+  return `/api/communication-binder/${messageId}/undo`;
+};
+
+export const undoBinderEntry = async (
+  messageId: number,
+  options?: RequestInit,
+): Promise<BinderEntry> => {
+  return customFetch<BinderEntry>(getUndoBinderEntryUrl(messageId), {
+    ...options,
+    method: "PATCH",
+  });
+};
+
+export const getUndoBinderEntryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof undoBinderEntry>>,
+    TError,
+    { messageId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof undoBinderEntry>>,
+  TError,
+  { messageId: number },
+  TContext
+> => {
+  const mutationKey = ["undoBinderEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof undoBinderEntry>>,
+    { messageId: number }
+  > = (props) => {
+    const { messageId } = props ?? {};
+
+    return undoBinderEntry(messageId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UndoBinderEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof undoBinderEntry>>
+>;
+
+export type UndoBinderEntryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Undo resolve — move entry back to Active
+ */
+export const useUndoBinderEntry = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof undoBinderEntry>>,
+    TError,
+    { messageId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof undoBinderEntry>>,
+  TError,
+  { messageId: number },
+  TContext
+> => {
+  return useMutation(getUndoBinderEntryMutationOptions(options));
 };
 
 /**

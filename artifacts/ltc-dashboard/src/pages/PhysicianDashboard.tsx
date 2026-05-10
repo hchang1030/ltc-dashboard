@@ -2,8 +2,12 @@ import {
   useGetPhysicianSummary,
   getGetPhysicianSummaryQueryKey,
   useListBowelMovements,
+  useListBinderEntries,
+  useResolveBinderEntry,
+  useUndoBinderEntry,
+  getListBinderEntriesQueryKey,
 } from "@workspace/api-client-react";
-import type { ResidentAlertSummary } from "@workspace/api-client-react";
+import type { ResidentAlertSummary, BinderEntry } from "@workspace/api-client-react";
 import {
   Clock,
   RefreshCw,
@@ -14,8 +18,12 @@ import {
   ChevronRight,
   Droplet,
   Activity,
+  Megaphone,
+  CheckCircle2,
+  Undo2,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -280,11 +288,207 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
   );
 }
 
+// ── Virtual Binder ────────────────────────────────────────────────────────────
+
+function formatElapsed(timestamp: string | Date): string {
+  const diff = Date.now() - new Date(timestamp).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function BinderCard({
+  entry,
+  onResolve,
+  onUndo,
+  isPending,
+}: {
+  entry: BinderEntry;
+  onResolve?: () => void;
+  onUndo?: () => void;
+  isPending: boolean;
+}) {
+  const isResolved = entry.status === "Resolved";
+
+  return (
+    <div className={[
+      "rounded-xl border p-5 space-y-3 transition-all",
+      isResolved ? "border-border/40 bg-background/40 opacity-80" : "border-sky-700/40 bg-sky-950/20",
+    ].join(" ")}>
+      {/* Top row */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={["font-bold text-base", isResolved ? "text-muted-foreground" : "text-foreground"].join(" ")}>
+              {entry.residentName}
+            </span>
+            <span className="font-mono text-xs bg-muted/60 border border-border px-2 py-0.5 rounded text-muted-foreground">
+              Room {entry.residentRoom}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground font-mono">{formatElapsed(entry.timestamp)}</p>
+        </div>
+        {!isResolved && onResolve && (
+          <button
+            onClick={onResolve}
+            disabled={isPending}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-sm bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 hover:bg-emerald-800/50 transition-colors disabled:opacity-50"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Mark Resolved
+          </button>
+        )}
+        {isResolved && onUndo && (
+          <button
+            onClick={onUndo}
+            disabled={isPending}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-sm bg-muted/40 border border-border text-muted-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
+          >
+            <Undo2 className="w-4 h-4" />
+            Undo
+          </button>
+        )}
+      </div>
+
+      {/* Message */}
+      <p className={[
+        "text-sm leading-relaxed px-4 py-3 rounded-lg border",
+        isResolved
+          ? "line-through text-muted-foreground/60 bg-muted/20 border-border/30"
+          : "text-foreground bg-card border-border/50",
+      ].join(" ")}>
+        {entry.messageText}
+      </p>
+
+      {isResolved && entry.resolvedTimestamp && (
+        <p className="text-xs text-muted-foreground/50 font-mono">
+          Resolved {formatElapsed(entry.resolvedTimestamp)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function VirtualBinder() {
+  const [binderTab, setBinderTab] = useState<"Active" | "Resolved">("Active");
+  const queryClient = useQueryClient();
+
+  const { data: entries = [], isLoading, refetch, isFetching } = useListBinderEntries(
+    { status: binderTab },
+    { query: { queryKey: getListBinderEntriesQueryKey({ status: binderTab }), refetchInterval: 30_000 } },
+  );
+
+  const resolve = useResolveBinderEntry();
+  const undo = useUndoBinderEntry();
+
+  const handleResolve = (id: number) => {
+    resolve.mutate({ messageId: id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListBinderEntriesQueryKey() });
+      },
+    });
+  };
+
+  const handleUndo = (id: number) => {
+    undo.mutate({ messageId: id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListBinderEntriesQueryKey() });
+      },
+    });
+  };
+
+  return (
+    <section className="space-y-5">
+      {/* Toggle */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setBinderTab("Active")}
+          className={[
+            "flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
+            binderTab === "Active"
+              ? "bg-sky-700/40 border-sky-500 text-sky-200 shadow-md"
+              : "bg-card border-border text-muted-foreground hover:border-sky-500/40",
+          ].join(" ")}
+        >
+          <Megaphone className="w-4 h-4" />
+          Active Issues
+        </button>
+        <button
+          onClick={() => setBinderTab("Resolved")}
+          className={[
+            "flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
+            binderTab === "Resolved"
+              ? "bg-emerald-900/40 border-emerald-600 text-emerald-300 shadow-md"
+              : "bg-card border-border text-muted-foreground hover:border-emerald-600/40",
+          ].join(" ")}
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          Resolved Issues
+        </button>
+      </div>
+
+      {/* Refresh row */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          {binderTab === "Active" ? "Active messages awaiting physician review" : "Resolved — crossed off the binder"}
+        </h2>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors text-xs disabled:opacity-50"
+        >
+          <RefreshCw className={["w-3.5 h-3.5", isFetching ? "animate-spin" : ""].join(" ")} />
+          Refresh
+        </button>
+      </div>
+
+      {/* List */}
+      {isLoading && (
+        <div className="text-center py-12 text-muted-foreground">Loading binder entries...</div>
+      )}
+
+      {!isLoading && entries.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-center bg-card border border-border rounded-xl">
+          <div className="bg-muted/40 p-5 rounded-full">
+            {binderTab === "Active"
+              ? <Megaphone className="w-8 h-8 text-muted-foreground/50" />
+              : <CheckCircle2 className="w-8 h-8 text-muted-foreground/50" />}
+          </div>
+          <p className="text-muted-foreground font-medium">
+            {binderTab === "Active" ? "No active messages" : "No resolved messages"}
+          </p>
+          <p className="text-muted-foreground/60 text-sm">
+            {binderTab === "Active"
+              ? "Care aides can send messages from the resident module hub."
+              : "Resolved messages will appear here."}
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {entries.map((entry) => (
+          <BinderCard
+            key={entry.id}
+            entry={entry}
+            onResolve={binderTab === "Active" ? () => handleResolve(entry.id) : undefined}
+            onUndo={binderTab === "Resolved" ? () => handleUndo(entry.id) : undefined}
+            isPending={resolve.isPending || undo.isPending}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
   const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
+  const [view, setView] = useState<"population" | "binder">("population");
 
   const { data, isLoading, isError, refetch, isFetching } = useGetPhysicianSummary({
     query: { refetchInterval: 60_000, queryKey: getGetPhysicianSummaryQueryKey() },
@@ -337,9 +541,40 @@ export default function PhysicianDashboard() {
         </div>
       </header>
 
+      {/* View Tabs */}
+      <div className="sticky top-[57px] z-20 bg-background border-b border-border px-6 py-3">
+        <div className="max-w-7xl mx-auto flex gap-2">
+          <button
+            onClick={() => setView("population")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "population"
+                ? "bg-primary/15 border-primary text-primary shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-primary/40",
+            ].join(" ")}
+          >
+            <Activity className="w-4 h-4" />
+            Population Health
+          </button>
+          <button
+            onClick={() => setView("binder")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "binder"
+                ? "bg-sky-700/20 border-sky-500 text-sky-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-sky-500/40",
+            ].join(" ")}
+          >
+            <Megaphone className="w-4 h-4" />
+            Virtual Binder
+          </button>
+        </div>
+      </div>
+
       <main className="max-w-7xl mx-auto p-8 space-y-8">
-        {/* Alert Summary Cards */}
-        {alertCounts && (
+        {view === "binder" && <VirtualBinder />}
+
+        {view === "population" && alertCounts && (
           <section className="grid grid-cols-3 gap-4">
             <div className="bg-card border-2 border-red-600/40 rounded-xl p-5 flex items-center gap-4" data-testid="card-alert-red">
               <div className="bg-red-600/15 p-3 rounded-full">
@@ -372,7 +607,7 @@ export default function PhysicianDashboard() {
         )}
 
         {/* Resident Summary Table */}
-        <section className="space-y-3">
+        {view === "population" && <section className="space-y-3">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Resident Status — Click any row to view full history
           </h2>
@@ -499,10 +734,10 @@ export default function PhysicianDashboard() {
               </table>
             </div>
           )}
-        </section>
+        </section>}
 
         {/* Monthly Facility Stats */}
-        {data && (
+        {view === "population" && data && (
           <section className="space-y-3">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
               Facility Statistics — {monthName} {time.getFullYear()}

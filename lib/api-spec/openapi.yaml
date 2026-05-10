@@ -16,6 +16,7 @@ tags:
   - name: fallEvents
   - name: vitalEvents
   - name: physician
+  - name: communicationBinder
 
 paths:
   /healthz:
@@ -203,6 +204,82 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VitalEvent"
+
+  /communication-binder:
+    get:
+      operationId: listBinderEntries
+      tags: [communicationBinder]
+      summary: List communication binder entries
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Active, Resolved]
+      responses:
+        "200":
+          description: List of binder entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BinderEntry"
+    post:
+      operationId: createBinderEntry
+      tags: [communicationBinder]
+      summary: Post a message to the communication binder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BinderEntryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BinderEntry"
+
+  /communication-binder/{messageId}/resolve:
+    patch:
+      operationId: resolveBinderEntry
+      tags: [communicationBinder]
+      summary: Mark a binder entry as resolved
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BinderEntry"
+
+  /communication-binder/{messageId}/undo:
+    patch:
+      operationId: undoBinderEntry
+      tags: [communicationBinder]
+      summary: Undo resolve — move entry back to Active
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BinderEntry"
 
   /physician/summary:
     get:
@@ -570,6 +647,38 @@ components:
           type: boolean
         hasAbnormalVital24h:
           type: boolean
+
+    BinderEntryInput:
+      type: object
+      required: [residentId, messageText]
+      properties:
+        residentId:
+          type: integer
+        messageText:
+          type: string
+
+    BinderEntry:
+      type: object
+      required: [id, residentId, residentName, residentRoom, messageText, status, timestamp]
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        residentName:
+          type: string
+        residentRoom:
+          type: string
+        messageText:
+          type: string
+        status:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        resolvedTimestamp:
+          type: ["string", "null"]
+          format: date-time
 
     PhysicianSummary:
       type: object

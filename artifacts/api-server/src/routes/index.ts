@@ -8,6 +8,7 @@ import intakeRouter from "./intake";
 import fallRouter from "./fall";
 import vitalRouter from "./vital";
 import physicianRouter from "./physician";
+import communicationBinderRouter from "./communicationBinder";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(intakeRouter);
 router.use(fallRouter);
 router.use(vitalRouter);
 router.use(physicianRouter);
+router.use(communicationBinderRouter);
 
 export default router;

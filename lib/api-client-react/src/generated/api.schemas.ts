@@ -279,6 +279,23 @@ export interface ResidentAlertSummary {
   hasAbnormalVital24h: boolean;
 }
 
+export interface BinderEntryInput {
+  residentId: number;
+  messageText: string;
+}
+
+export interface BinderEntry {
+  id: number;
+  residentId: number;
+  residentName: string;
+  residentRoom: string;
+  messageText: string;
+  status: string;
+  timestamp: string;
+  /** @nullable */
+  resolvedTimestamp?: string | null;
+}
+
 export interface PhysicianSummary {
   residents: ResidentAlertSummary[];
   facilityMonthlyGaps: number;
@@ -289,3 +306,15 @@ export interface PhysicianSummary {
 export type ListBowelMovementsParams = {
   residentId?: number;
 };
+
+export type ListBinderEntriesParams = {
+  status?: ListBinderEntriesStatus;
+};
+
+export type ListBinderEntriesStatus =
+  (typeof ListBinderEntriesStatus)[keyof typeof ListBinderEntriesStatus];
+
+export const ListBinderEntriesStatus = {
+  Active: "Active",
+  Resolved: "Resolved",
+} as const;
