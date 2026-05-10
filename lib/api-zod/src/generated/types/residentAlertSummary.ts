@@ -15,6 +15,16 @@ export interface ResidentAlertSummary {
   phn?: string | null;
   /** @nullable */
   dob?: Date | null;
+  /** @nullable */
+  codeStatus?: string | null;
+  allergies?: string[];
+  infectionFlags?: string[];
+  /** @nullable */
+  sdmName?: string | null;
+  /** @nullable */
+  sdmRelation?: string | null;
+  /** @nullable */
+  sdmPhone?: string | null;
   alertLevel: ResidentAlertSummaryAlertLevel;
   /** @nullable */
   lastBMAt: Date | null;

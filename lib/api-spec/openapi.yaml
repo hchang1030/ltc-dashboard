@@ -158,6 +158,31 @@ paths:
                 items:
                   $ref: "#/components/schemas/CommunicationLog"
 
+  /residents/{residentId}/demographics:
+    patch:
+      operationId: updateResidentDemographics
+      tags: [residents]
+      summary: Update resident demographics (code status, allergies, infection flags, SDM)
+      parameters:
+        - name: residentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResidentDemographicsInput"
+      responses:
+        "200":
+          description: Updated resident
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resident"
+
   /residents/{residentId}/favorite:
     patch:
       operationId: toggleFavorite
@@ -613,6 +638,42 @@ components:
           format: date
         phn:
           type: ["string", "null"]
+        codeStatus:
+          type: ["string", "null"]
+        allergies:
+          type: array
+          items:
+            type: string
+        infectionFlags:
+          type: array
+          items:
+            type: string
+        sdmName:
+          type: ["string", "null"]
+        sdmRelation:
+          type: ["string", "null"]
+        sdmPhone:
+          type: ["string", "null"]
+
+    ResidentDemographicsInput:
+      type: object
+      properties:
+        codeStatus:
+          type: ["string", "null"]
+        allergies:
+          type: array
+          items:
+            type: string
+        infectionFlags:
+          type: array
+          items:
+            type: string
+        sdmName:
+          type: ["string", "null"]
+        sdmRelation:
+          type: ["string", "null"]
+        sdmPhone:
+          type: ["string", "null"]
 
     FavoriteToggle:
       type: object
@@ -930,6 +991,22 @@ components:
         dob:
           type: ["string", "null"]
           format: date
+        codeStatus:
+          type: ["string", "null"]
+        allergies:
+          type: array
+          items:
+            type: string
+        infectionFlags:
+          type: array
+          items:
+            type: string
+        sdmName:
+          type: ["string", "null"]
+        sdmRelation:
+          type: ["string", "null"]
+        sdmPhone:
+          type: ["string", "null"]
         alertLevel:
           type: string
           enum: [none, amber, red]

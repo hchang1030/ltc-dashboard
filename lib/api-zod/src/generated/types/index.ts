@@ -54,6 +54,7 @@ export * from "./physicianSummary";
 export * from "./resident";
 export * from "./residentAlertSummary";
 export * from "./residentAlertSummaryAlertLevel";
+export * from "./residentDemographicsInput";
 export * from "./residentOrder";
 export * from "./residentOrderInput";
 export * from "./residentOrderStatus";

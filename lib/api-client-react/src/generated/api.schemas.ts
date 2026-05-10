@@ -18,6 +18,29 @@ export interface Resident {
   dob?: string | null;
   /** @nullable */
   phn?: string | null;
+  /** @nullable */
+  codeStatus?: string | null;
+  allergies?: string[];
+  infectionFlags?: string[];
+  /** @nullable */
+  sdmName?: string | null;
+  /** @nullable */
+  sdmRelation?: string | null;
+  /** @nullable */
+  sdmPhone?: string | null;
+}
+
+export interface ResidentDemographicsInput {
+  /** @nullable */
+  codeStatus?: string | null;
+  allergies?: string[];
+  infectionFlags?: string[];
+  /** @nullable */
+  sdmName?: string | null;
+  /** @nullable */
+  sdmRelation?: string | null;
+  /** @nullable */
+  sdmPhone?: string | null;
 }
 
 export interface FavoriteToggle {
@@ -274,6 +297,16 @@ export interface ResidentAlertSummary {
   phn?: string | null;
   /** @nullable */
   dob?: string | null;
+  /** @nullable */
+  codeStatus?: string | null;
+  allergies?: string[];
+  infectionFlags?: string[];
+  /** @nullable */
+  sdmName?: string | null;
+  /** @nullable */
+  sdmRelation?: string | null;
+  /** @nullable */
+  sdmPhone?: string | null;
   alertLevel: ResidentAlertSummaryAlertLevel;
   /** @nullable */
   lastBMAt: string | null;

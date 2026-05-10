@@ -24,6 +24,12 @@ export const ListResidentsResponseItem = zod.object({
   isFavorited: zod.boolean(),
   dob: zod.coerce.date().nullish(),
   phn: zod.string().nullish(),
+  codeStatus: zod.string().nullish(),
+  allergies: zod.array(zod.string()).optional(),
+  infectionFlags: zod.array(zod.string()).optional(),
+  sdmName: zod.string().nullish(),
+  sdmRelation: zod.string().nullish(),
+  sdmPhone: zod.string().nullish(),
 });
 export const ListResidentsResponse = zod.array(ListResidentsResponseItem);
 
@@ -111,6 +117,37 @@ export const ListCommunicationsResponse = zod.array(
 );
 
 /**
+ * @summary Update resident demographics (code status, allergies, infection flags, SDM)
+ */
+export const UpdateResidentDemographicsParams = zod.object({
+  residentId: zod.coerce.number(),
+});
+
+export const UpdateResidentDemographicsBody = zod.object({
+  codeStatus: zod.string().nullish(),
+  allergies: zod.array(zod.string()).optional(),
+  infectionFlags: zod.array(zod.string()).optional(),
+  sdmName: zod.string().nullish(),
+  sdmRelation: zod.string().nullish(),
+  sdmPhone: zod.string().nullish(),
+});
+
+export const UpdateResidentDemographicsResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  room: zod.string(),
+  isFavorited: zod.boolean(),
+  dob: zod.coerce.date().nullish(),
+  phn: zod.string().nullish(),
+  codeStatus: zod.string().nullish(),
+  allergies: zod.array(zod.string()).optional(),
+  infectionFlags: zod.array(zod.string()).optional(),
+  sdmName: zod.string().nullish(),
+  sdmRelation: zod.string().nullish(),
+  sdmPhone: zod.string().nullish(),
+});
+
+/**
  * @summary Toggle a resident's favorited status
  */
 export const ToggleFavoriteParams = zod.object({
@@ -128,6 +165,12 @@ export const ToggleFavoriteResponse = zod.object({
   isFavorited: zod.boolean(),
   dob: zod.coerce.date().nullish(),
   phn: zod.string().nullish(),
+  codeStatus: zod.string().nullish(),
+  allergies: zod.array(zod.string()).optional(),
+  infectionFlags: zod.array(zod.string()).optional(),
+  sdmName: zod.string().nullish(),
+  sdmRelation: zod.string().nullish(),
+  sdmPhone: zod.string().nullish(),
 });
 
 /**
@@ -331,6 +374,12 @@ export const GetPhysicianSummaryResponse = zod.object({
       room: zod.string(),
       phn: zod.string().nullish(),
       dob: zod.coerce.date().nullish(),
+      codeStatus: zod.string().nullish(),
+      allergies: zod.array(zod.string()).optional(),
+      infectionFlags: zod.array(zod.string()).optional(),
+      sdmName: zod.string().nullish(),
+      sdmRelation: zod.string().nullish(),
+      sdmPhone: zod.string().nullish(),
       alertLevel: zod.enum(["none", "amber", "red"]),
       lastBMAt: zod.coerce.date().nullable(),
       hoursSinceLastBM: zod.number().nullable(),

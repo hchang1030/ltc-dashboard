@@ -22,6 +22,7 @@ import {
   useUpdateOrderTemplate,
   getListOrderTemplatesQueryKey,
   getListResidentOrdersQueryKey,
+  useUpdateResidentDemographics,
 } from "@workspace/api-client-react";
 import type { ResidentAlertSummary, BinderEntry, ContactDirectoryEntry, CommunicationLog, OrderTemplate } from "@workspace/api-client-react";
 import {
@@ -51,6 +52,11 @@ import {
   FileText,
   ClipboardList,
   Stethoscope,
+  Shield,
+  AlertCircle,
+  Phone,
+  Save,
+  UserCheck,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -107,32 +113,123 @@ interface DrillPanelProps {
   onClose: () => void;
 }
 
+function TagInput({ tags, onAdd, onRemove, placeholder, inputValue, setInputValue }: {
+  tags: string[]; onAdd: (v: string) => void; onRemove: (v: string) => void;
+  placeholder: string; inputValue: string; setInputValue: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {tags.map((t) => (
+          <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-muted border border-border text-foreground">
+            {t}
+            <button type="button" onClick={() => onRemove(t)} className="ml-0.5 hover:text-red-400 transition-colors"><X className="w-3 h-3" /></button>
+          </span>
+        ))}
+      </div>
+      <input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === ",") && inputValue.trim()) {
+            e.preventDefault();
+            onAdd(inputValue.trim());
+            setInputValue("");
+          }
+        }}
+        placeholder={placeholder}
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+    </div>
+  );
+}
+
 function DrillPanel({ resident, onClose }: DrillPanelProps) {
   const isOpen = resident !== null;
+  const [isEditing, setIsEditing] = useState(false);
+
+  const [formCodeStatus, setFormCodeStatus] = useState("");
+  const [formAllergies, setFormAllergies] = useState<string[]>([]);
+  const [formInfectionFlags, setFormInfectionFlags] = useState<string[]>([]);
+  const [formSdmName, setFormSdmName] = useState("");
+  const [formSdmRelation, setFormSdmRelation] = useState("");
+  const [formSdmPhone, setFormSdmPhone] = useState("");
+  const [allergyInput, setAllergyInput] = useState("");
+  const [flagInput, setFlagInput] = useState("");
+
+  const queryClient = useQueryClient();
+  const { mutate: saveDemographics, isPending: isSaving } = useUpdateResidentDemographics();
+
+  const openEdit = useCallback(() => {
+    setFormCodeStatus(resident?.codeStatus ?? "");
+    setFormAllergies(resident?.allergies ?? []);
+    setFormInfectionFlags(resident?.infectionFlags ?? []);
+    setFormSdmName(resident?.sdmName ?? "");
+    setFormSdmRelation(resident?.sdmRelation ?? "");
+    setFormSdmPhone(resident?.sdmPhone ?? "");
+    setAllergyInput("");
+    setFlagInput("");
+    setIsEditing(true);
+  }, [resident]);
+
+  const handleSave = useCallback(() => {
+    if (!resident) return;
+    saveDemographics(
+      {
+        residentId: resident.residentId,
+        data: {
+          codeStatus: formCodeStatus || null,
+          allergies: formAllergies,
+          infectionFlags: formInfectionFlags,
+          sdmName: formSdmName || null,
+          sdmRelation: formSdmRelation || null,
+          sdmPhone: formSdmPhone || null,
+        },
+      },
+      {
+        onSuccess: () => {
+          void queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
+          setIsEditing(false);
+        },
+      },
+    );
+  }, [resident, formCodeStatus, formAllergies, formInfectionFlags, formSdmName, formSdmRelation, formSdmPhone, saveDemographics, queryClient]);
 
   const { data: events = [], isLoading } = useListBowelMovements(
     { residentId: resident?.residentId },
     { query: { enabled: !!resident, queryKey: [`/api/bowel-movements`, { residentId: resident?.residentId }] } },
   );
 
-  // sorted newest first
   const sorted = [...events].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
-  // close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (isEditing) setIsEditing(false);
+        else onClose();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, isEditing]);
+
+  useEffect(() => {
+    if (!isOpen) setIsEditing(false);
+  }, [isOpen]);
 
   const isRed   = resident?.alertLevel === "red";
   const isAmber = resident?.alertLevel === "amber";
   const nameCls = isRed ? "text-red-400" : isAmber ? "text-amber-400" : "text-foreground";
   const alertDot = isRed ? "bg-red-500" : isAmber ? "bg-amber-400" : "bg-emerald-500";
+
+  const initials = resident?.name
+    ? resident.name.split(" ").map((p) => p[0]).slice(0, 2).join("")
+    : "?";
+
+  const hasAlerts = !!(resident?.codeStatus || resident?.allergies?.length || resident?.infectionFlags?.length);
 
   return (
     <>
@@ -150,33 +247,41 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
       <aside
         data-testid="drill-panel"
         className={[
-          "fixed top-0 right-0 h-full w-[560px] max-w-full bg-card border-l border-border z-[70]",
+          "fixed top-0 right-0 h-full w-[580px] max-w-full bg-card border-l border-border z-[70]",
           "flex flex-col shadow-2xl transition-transform duration-300 ease-in-out",
           isOpen ? "translate-x-0" : "translate-x-full",
         ].join(" ")}
       >
         {/* Panel header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-border bg-card shrink-0">
-          <div className="flex items-center gap-3">
-            <span className={["w-3 h-3 rounded-full mt-1 shrink-0", alertDot].join(" ")} />
+          <div className="flex items-center gap-4">
+            {/* Photo placeholder */}
+            <div className={[
+              "w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold shrink-0 border-2",
+              isRed ? "bg-red-900/40 text-red-300 border-red-700/50"
+                : isAmber ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
+                : "bg-muted text-muted-foreground border-border",
+            ].join(" ")}>
+              {initials}
+            </div>
             <div>
               <h2 className={["text-xl font-bold", nameCls].join(" ")}>
                 {resident?.name ?? "—"}
               </h2>
               <p className="text-xs text-muted-foreground">Room {resident?.room}</p>
               {resident && (
-                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
                   {resident.phn && (
                     <span className="text-xs text-muted-foreground">
-                      <span className="font-semibold text-muted-foreground/70 uppercase tracking-wider text-[10px]">PHN </span>
+                      <span className="font-semibold text-muted-foreground/60 uppercase tracking-wider text-[10px]">PHN </span>
                       <span className="font-mono">{resident.phn}</span>
                     </span>
                   )}
                   {resident.dob && (
                     <span className="text-xs text-muted-foreground">
-                      <span className="font-semibold text-muted-foreground/70 uppercase tracking-wider text-[10px]">DOB </span>
+                      <span className="font-semibold text-muted-foreground/60 uppercase tracking-wider text-[10px]">DOB </span>
                       <span className="font-mono">{String(resident.dob).slice(0, 10)}</span>
-                      <span className="ml-1 text-muted-foreground/60">
+                      <span className="ml-1 text-muted-foreground/50">
                         ({(() => {
                           const d = new Date(String(resident.dob));
                           const today = new Date();
@@ -191,17 +296,78 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
               )}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            data-testid="btn-drill-close"
-            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {!isEditing && (
+              <button
+                onClick={openEdit}
+                title="Edit demographics"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors text-xs font-medium"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Edit
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              data-testid="btn-drill-close"
+              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
+        {/* High-alert tags */}
+        {resident && hasAlerts && !isEditing && (
+          <div className="px-6 py-3 border-b border-border shrink-0 flex flex-wrap gap-2">
+            {resident.codeStatus && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-900/40 text-purple-300 border border-purple-500/40 uppercase tracking-wide">
+                <Shield className="w-3 h-3 shrink-0" />
+                {resident.codeStatus}
+              </span>
+            )}
+            {resident.allergies?.map((a) => (
+              <span key={a} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-900/40 text-red-300 border border-red-500/40 uppercase tracking-wide">
+                <AlertCircle className="w-3 h-3 shrink-0" />
+                ALLERGY: {a}
+              </span>
+            ))}
+            {resident.infectionFlags?.map((f) => (
+              <span key={f} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-900/40 text-amber-300 border border-amber-500/40 uppercase tracking-wide">
+                <AlertTriangle className="w-3 h-3 shrink-0" />
+                ISOLATION: {f}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* SDM section */}
+        {resident?.sdmName && !isEditing && (
+          <div className="px-6 py-3 border-b border-border shrink-0 bg-muted/20">
+            <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 mb-2 flex items-center gap-1.5">
+              <UserCheck className="w-3 h-3" />
+              Substitute Decision Maker
+            </p>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{resident.sdmName}</p>
+                {resident.sdmRelation && <p className="text-xs text-muted-foreground">{resident.sdmRelation}</p>}
+              </div>
+              {resident.sdmPhone && (
+                <a
+                  href={`tel:${resident.sdmPhone}`}
+                  className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-mono font-medium shrink-0"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  {resident.sdmPhone}
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Alert strip */}
-        {resident && (
+        {resident && !isEditing && (
           <div
             className={[
               "px-6 py-2.5 text-sm font-semibold flex items-center gap-2 shrink-0",
@@ -219,83 +385,184 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
           </div>
         )}
 
-        {/* Monthly badges */}
-        {resident && (
-          <div className="flex gap-2 px-6 py-3 border-b border-border shrink-0 flex-wrap">
-            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-1.5">
-              <CalendarX className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-amber-400 font-bold text-sm">{resident.monthlyGapCount}</span>
-              <span className="text-muted-foreground text-xs">48h gaps</span>
+        {/* Edit form */}
+        {isEditing ? (
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-6 py-5 space-y-6">
+              <p className="text-xs uppercase tracking-widest font-bold text-muted-foreground/60">Editing Demographics — {resident?.name}</p>
+
+              {/* Code Status */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-purple-400" /> Code Status
+                </label>
+                <input
+                  type="text"
+                  value={formCodeStatus}
+                  onChange={(e) => setFormCodeStatus(e.target.value)}
+                  placeholder="e.g. DNR M1-M4 C1, C2 · Full Code · CPR"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              {/* Allergies */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400" /> Allergies
+                </label>
+                <TagInput
+                  tags={formAllergies}
+                  onAdd={(v) => setFormAllergies((p) => [...p, v])}
+                  onRemove={(v) => setFormAllergies((p) => p.filter((x) => x !== v))}
+                  placeholder="Type allergy and press Enter (e.g. Penicillin)"
+                  inputValue={allergyInput}
+                  setInputValue={setAllergyInput}
+                />
+              </div>
+
+              {/* Infection Control */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Infection Control Flags
+                </label>
+                <TagInput
+                  tags={formInfectionFlags}
+                  onAdd={(v) => setFormInfectionFlags((p) => [...p, v])}
+                  onRemove={(v) => setFormInfectionFlags((p) => p.filter((x) => x !== v))}
+                  placeholder="Type flag and press Enter (e.g. MRSA, VRE, C.diff)"
+                  inputValue={flagInput}
+                  setInputValue={setFlagInput}
+                />
+              </div>
+
+              {/* SDM */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-primary" /> Substitute Decision Maker
+                </label>
+                <input
+                  type="text"
+                  value={formSdmName}
+                  onChange={(e) => setFormSdmName(e.target.value)}
+                  placeholder="Full name"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <input
+                  type="text"
+                  value={formSdmRelation}
+                  onChange={(e) => setFormSdmRelation(e.target.value)}
+                  placeholder="Relationship (e.g. Daughter, Son, Spouse)"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <input
+                  type="tel"
+                  value={formSdmPhone}
+                  onChange={(e) => setFormSdmPhone(e.target.value)}
+                  placeholder="Phone number"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-2 bg-red-600/10 border border-red-600/25 rounded-lg px-3 py-1.5">
-              <Droplet className="w-3.5 h-3.5 text-red-400" />
-              <span className="text-red-400 font-bold text-sm">{resident.monthlyBloodCount}</span>
-              <span className="text-muted-foreground text-xs">blood events</span>
-            </div>
-            <div className="flex items-center gap-2 bg-primary/10 border border-primary/25 rounded-lg px-3 py-1.5">
-              <Activity className="w-3.5 h-3.5 text-primary" />
-              <span className="text-primary font-bold text-sm">{events.length}</span>
-              <span className="text-muted-foreground text-xs">BMs recorded</span>
+
+            {/* Save / Cancel bar */}
+            <div className="sticky bottom-0 border-t border-border bg-card px-6 py-4 flex gap-3">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {isSaving ? "Saving…" : "Save Changes"}
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors text-sm font-medium"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
+        ) : (
+          <>
+            {/* Monthly badges */}
+            {resident && (
+              <div className="flex gap-2 px-6 py-3 border-b border-border shrink-0 flex-wrap">
+                <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-1.5">
+                  <CalendarX className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-amber-400 font-bold text-sm">{resident.monthlyGapCount}</span>
+                  <span className="text-muted-foreground text-xs">48h gaps</span>
+                </div>
+                <div className="flex items-center gap-2 bg-red-600/10 border border-red-600/25 rounded-lg px-3 py-1.5">
+                  <Droplet className="w-3.5 h-3.5 text-red-400" />
+                  <span className="text-red-400 font-bold text-sm">{resident.monthlyBloodCount}</span>
+                  <span className="text-muted-foreground text-xs">blood events</span>
+                </div>
+                <div className="flex items-center gap-2 bg-primary/10 border border-primary/25 rounded-lg px-3 py-1.5">
+                  <Activity className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-primary font-bold text-sm">{events.length}</span>
+                  <span className="text-muted-foreground text-xs">BMs recorded</span>
+                </div>
+              </div>
+            )}
 
-        {/* BM History */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {isLoading && (
-            <p className="text-muted-foreground text-center py-12">Loading history...</p>
-          )}
-          {!isLoading && sorted.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-              <div className="bg-muted/40 p-5 rounded-full">
-                <Activity className="w-8 h-8 text-muted-foreground/50" />
-              </div>
-              <p className="text-muted-foreground font-medium">No bowel movements recorded yet</p>
-              <p className="text-muted-foreground/60 text-sm">Use the Frontline Staff view to log the first entry.</p>
-            </div>
-          )}
-          {sorted.map((bm, idx) => {
-            const bristol = BRISTOL_COLORS[bm.bristolType] ?? BRISTOL_COLORS[4];
-            const hasFlags = bm.incontinence || bm.bloodPresent || bm.mucusPresent || bm.painStraining;
-            const isFirst = idx === 0;
-            return (
-              <div
-                key={bm.id}
-                data-testid={`drill-event-${bm.id}`}
-                className={["rounded-xl border p-4 space-y-3", isFirst ? "border-primary/40 bg-primary/5" : "border-border bg-background/60"].join(" ")}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {formatFull(bm.createdAt)}
-                    {isFirst && (
-                      <span className="ml-2 text-primary font-bold uppercase tracking-wider text-[10px] bg-primary/15 px-2 py-0.5 rounded-full">Most recent</span>
+            {/* BM History */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {isLoading && (
+                <p className="text-muted-foreground text-center py-12">Loading history...</p>
+              )}
+              {!isLoading && sorted.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                  <div className="bg-muted/40 p-5 rounded-full">
+                    <Activity className="w-8 h-8 text-muted-foreground/50" />
+                  </div>
+                  <p className="text-muted-foreground font-medium">No bowel movements recorded yet</p>
+                  <p className="text-muted-foreground/60 text-sm">Use the Frontline Staff view to log the first entry.</p>
+                </div>
+              )}
+              {sorted.map((bm, idx) => {
+                const bristol = BRISTOL_COLORS[bm.bristolType] ?? BRISTOL_COLORS[4];
+                const hasFlags = bm.incontinence || bm.bloodPresent || bm.mucusPresent || bm.painStraining;
+                const isFirst = idx === 0;
+                return (
+                  <div
+                    key={bm.id}
+                    data-testid={`drill-event-${bm.id}`}
+                    className={["rounded-xl border p-4 space-y-3", isFirst ? "border-primary/40 bg-primary/5" : "border-border bg-background/60"].join(" ")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {formatFull(bm.createdAt)}
+                        {isFirst && (
+                          <span className="ml-2 text-primary font-bold uppercase tracking-wider text-[10px] bg-primary/15 px-2 py-0.5 rounded-full">Most recent</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className={["w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0", bristol.dot, bristol.text].join(" ")}>
+                        {bm.bristolType}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground text-sm">Type {bm.bristolType} &nbsp;·&nbsp; {bristol.label}</p>
+                        <p className="text-muted-foreground text-sm">Amount: <span className="font-medium text-foreground">{bm.amount}</span></p>
+                      </div>
+                    </div>
+                    {hasFlags && (
+                      <div className="flex flex-wrap gap-2">
+                        {bm.incontinence && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">Incontinence</span>}
+                        {bm.bloodPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-600/20 text-red-400 border border-red-600/30">Blood Present</span>}
+                        {bm.mucusPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Mucus Present</span>}
+                        {bm.painStraining && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">Pain / Straining</span>}
+                      </div>
                     )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className={["w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0", bristol.dot, bristol.text].join(" ")}>
-                    {bm.bristolType}
+                    {bm.clinicalNote && (
+                      <p className="text-xs font-mono text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 leading-relaxed border border-border/50">{bm.clinicalNote}</p>
+                    )}
                   </div>
-                  <div>
-                    <p className="font-semibold text-foreground text-sm">Type {bm.bristolType} &nbsp;·&nbsp; {bristol.label}</p>
-                    <p className="text-muted-foreground text-sm">Amount: <span className="font-medium text-foreground">{bm.amount}</span></p>
-                  </div>
-                </div>
-                {hasFlags && (
-                  <div className="flex flex-wrap gap-2">
-                    {bm.incontinence && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">Incontinence</span>}
-                    {bm.bloodPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-600/20 text-red-400 border border-red-600/30">Blood Present</span>}
-                    {bm.mucusPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Mucus Present</span>}
-                    {bm.painStraining && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">Pain / Straining</span>}
-                  </div>
-                )}
-                {bm.clinicalNote && (
-                  <p className="text-xs font-mono text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 leading-relaxed border border-border/50">{bm.clinicalNote}</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </aside>
     </>
   );

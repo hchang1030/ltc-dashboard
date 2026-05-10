@@ -48,6 +48,7 @@ import type {
   PainEventInput,
   PhysicianSummary,
   Resident,
+  ResidentDemographicsInput,
   ResidentOrder,
   ResidentOrderInput,
   VitalEvent,
@@ -727,6 +728,94 @@ export function useListCommunications<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Update resident demographics (code status, allergies, infection flags, SDM)
+ */
+export const getUpdateResidentDemographicsUrl = (residentId: number) => {
+  return `/api/residents/${residentId}/demographics`;
+};
+
+export const updateResidentDemographics = async (
+  residentId: number,
+  residentDemographicsInput: ResidentDemographicsInput,
+  options?: RequestInit,
+): Promise<Resident> => {
+  return customFetch<Resident>(getUpdateResidentDemographicsUrl(residentId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(residentDemographicsInput),
+  });
+};
+
+export const getUpdateResidentDemographicsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateResidentDemographics>>,
+    TError,
+    { residentId: number; data: BodyType<ResidentDemographicsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateResidentDemographics>>,
+  TError,
+  { residentId: number; data: BodyType<ResidentDemographicsInput> },
+  TContext
+> => {
+  const mutationKey = ["updateResidentDemographics"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateResidentDemographics>>,
+    { residentId: number; data: BodyType<ResidentDemographicsInput> }
+  > = (props) => {
+    const { residentId, data } = props ?? {};
+
+    return updateResidentDemographics(residentId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateResidentDemographicsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateResidentDemographics>>
+>;
+export type UpdateResidentDemographicsMutationBody =
+  BodyType<ResidentDemographicsInput>;
+export type UpdateResidentDemographicsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update resident demographics (code status, allergies, infection flags, SDM)
+ */
+export const useUpdateResidentDemographics = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateResidentDemographics>>,
+    TError,
+    { residentId: number; data: BodyType<ResidentDemographicsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateResidentDemographics>>,
+  TError,
+  { residentId: number; data: BodyType<ResidentDemographicsInput> },
+  TContext
+> => {
+  return useMutation(getUpdateResidentDemographicsMutationOptions(options));
+};
 
 /**
  * @summary Toggle a resident's favorited status

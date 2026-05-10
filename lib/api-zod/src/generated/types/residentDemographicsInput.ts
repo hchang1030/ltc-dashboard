@@ -6,15 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Resident {
-  id: number;
-  name: string;
-  room: string;
-  isFavorited: boolean;
-  /** @nullable */
-  dob?: Date | null;
-  /** @nullable */
-  phn?: string | null;
+export interface ResidentDemographicsInput {
   /** @nullable */
   codeStatus?: string | null;
   allergies?: string[];

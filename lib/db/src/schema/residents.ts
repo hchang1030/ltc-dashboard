@@ -9,6 +9,12 @@ export const residentsTable = pgTable("residents", {
   isFavorited: boolean("is_favorited").notNull().default(false),
   dob: date("dob"),
   phn: text("phn"),
+  codeStatus: text("code_status"),
+  allergies: text("allergies").array(),
+  infectionFlags: text("infection_flags").array(),
+  sdmName: text("sdm_name"),
+  sdmRelation: text("sdm_relation"),
+  sdmPhone: text("sdm_phone"),
 });
 
 export const insertResidentSchema = createInsertSchema(residentsTable).omit({ id: true });
