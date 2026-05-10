@@ -8,3 +8,80 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface Resident {
+  id: number;
+  name: string;
+  room: string;
+}
+
+export interface BowelMovement {
+  id: number;
+  residentId: number;
+  bristolType: number;
+  amount: string;
+  incontinence: boolean;
+  bloodPresent: boolean;
+  mucusPresent: boolean;
+  painStraining: boolean;
+  clinicalNote: string;
+  createdAt: string;
+}
+
+export type BowelMovementInputAmount =
+  (typeof BowelMovementInputAmount)[keyof typeof BowelMovementInputAmount];
+
+export const BowelMovementInputAmount = {
+  Small: "Small",
+  Medium: "Medium",
+  Large: "Large",
+  XL: "XL",
+} as const;
+
+export interface BowelMovementInput {
+  residentId: number;
+  /**
+   * @minimum 1
+   * @maximum 7
+   */
+  bristolType: number;
+  amount: BowelMovementInputAmount;
+  incontinence: boolean;
+  bloodPresent: boolean;
+  mucusPresent: boolean;
+  painStraining: boolean;
+  clinicalNote: string;
+}
+
+export type ResidentAlertSummaryAlertLevel =
+  (typeof ResidentAlertSummaryAlertLevel)[keyof typeof ResidentAlertSummaryAlertLevel];
+
+export const ResidentAlertSummaryAlertLevel = {
+  none: "none",
+  amber: "amber",
+  red: "red",
+} as const;
+
+export interface ResidentAlertSummary {
+  residentId: number;
+  name: string;
+  room: string;
+  alertLevel: ResidentAlertSummaryAlertLevel;
+  /** @nullable */
+  lastBMAt: string | null;
+  /** @nullable */
+  hoursSinceLastBM: number | null;
+  monthlyGapCount: number;
+  monthlyBloodCount: number;
+}
+
+export interface PhysicianSummary {
+  residents: ResidentAlertSummary[];
+  facilityMonthlyGaps: number;
+  facilityMonthlyBlood: number;
+  generatedAt: string;
+}
+
+export type ListBowelMovementsParams = {
+  residentId?: number;
+};

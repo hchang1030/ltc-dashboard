@@ -5,18 +5,28 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  BowelMovement,
+  BowelMovementInput,
+  HealthStatus,
+  ListBowelMovementsParams,
+  PhysicianSummary,
+  Resident,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -92,6 +102,339 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List all residents
+ */
+export const getListResidentsUrl = () => {
+  return `/api/residents`;
+};
+
+export const listResidents = async (
+  options?: RequestInit,
+): Promise<Resident[]> => {
+  return customFetch<Resident[]>(getListResidentsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListResidentsQueryKey = () => {
+  return [`/api/residents`] as const;
+};
+
+export const getListResidentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listResidents>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listResidents>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListResidentsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listResidents>>> = ({
+    signal,
+  }) => listResidents({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listResidents>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListResidentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listResidents>>
+>;
+export type ListResidentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all residents
+ */
+
+export function useListResidents<
+  TData = Awaited<ReturnType<typeof listResidents>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listResidents>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListResidentsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List bowel movement events
+ */
+export const getListBowelMovementsUrl = (params?: ListBowelMovementsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/bowel-movements?${stringifiedParams}`
+    : `/api/bowel-movements`;
+};
+
+export const listBowelMovements = async (
+  params?: ListBowelMovementsParams,
+  options?: RequestInit,
+): Promise<BowelMovement[]> => {
+  return customFetch<BowelMovement[]>(getListBowelMovementsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListBowelMovementsQueryKey = (
+  params?: ListBowelMovementsParams,
+) => {
+  return [`/api/bowel-movements`, ...(params ? [params] : [])] as const;
+};
+
+export const getListBowelMovementsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBowelMovements>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListBowelMovementsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBowelMovements>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListBowelMovementsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listBowelMovements>>
+  > = ({ signal }) => listBowelMovements(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBowelMovements>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBowelMovementsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBowelMovements>>
+>;
+export type ListBowelMovementsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List bowel movement events
+ */
+
+export function useListBowelMovements<
+  TData = Awaited<ReturnType<typeof listBowelMovements>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListBowelMovementsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBowelMovements>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBowelMovementsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Record a bowel movement event
+ */
+export const getCreateBowelMovementUrl = () => {
+  return `/api/bowel-movements`;
+};
+
+export const createBowelMovement = async (
+  bowelMovementInput: BowelMovementInput,
+  options?: RequestInit,
+): Promise<BowelMovement> => {
+  return customFetch<BowelMovement>(getCreateBowelMovementUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bowelMovementInput),
+  });
+};
+
+export const getCreateBowelMovementMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBowelMovement>>,
+    TError,
+    { data: BodyType<BowelMovementInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBowelMovement>>,
+  TError,
+  { data: BodyType<BowelMovementInput> },
+  TContext
+> => {
+  const mutationKey = ["createBowelMovement"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBowelMovement>>,
+    { data: BodyType<BowelMovementInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createBowelMovement(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateBowelMovementMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createBowelMovement>>
+>;
+export type CreateBowelMovementMutationBody = BodyType<BowelMovementInput>;
+export type CreateBowelMovementMutationError = ErrorType<void>;
+
+/**
+ * @summary Record a bowel movement event
+ */
+export const useCreateBowelMovement = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBowelMovement>>,
+    TError,
+    { data: BodyType<BowelMovementInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createBowelMovement>>,
+  TError,
+  { data: BodyType<BowelMovementInput> },
+  TContext
+> => {
+  return useMutation(getCreateBowelMovementMutationOptions(options));
+};
+
+/**
+ * @summary Get physician population health summary
+ */
+export const getGetPhysicianSummaryUrl = () => {
+  return `/api/physician/summary`;
+};
+
+export const getPhysicianSummary = async (
+  options?: RequestInit,
+): Promise<PhysicianSummary> => {
+  return customFetch<PhysicianSummary>(getGetPhysicianSummaryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPhysicianSummaryQueryKey = () => {
+  return [`/api/physician/summary`] as const;
+};
+
+export const getGetPhysicianSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPhysicianSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPhysicianSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPhysicianSummaryQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPhysicianSummary>>
+  > = ({ signal }) => getPhysicianSummary({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPhysicianSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPhysicianSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPhysicianSummary>>
+>;
+export type GetPhysicianSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get physician population health summary
+ */
+
+export function useGetPhysicianSummary<
+  TData = Awaited<ReturnType<typeof getPhysicianSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPhysicianSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPhysicianSummaryQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

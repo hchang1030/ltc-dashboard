@@ -6,4 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./bowelMovement";
+export * from "./bowelMovementInput";
+export * from "./bowelMovementInputAmount";
 export * from "./healthStatus";
+export * from "./listBowelMovementsParams";
+export * from "./physicianSummary";
+export * from "./resident";
+export * from "./residentAlertSummary";
+export * from "./residentAlertSummaryAlertLevel";

@@ -10,6 +10,12 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: bowelMovements
+    description: Bowel movement tracking
+  - name: physician
+    description: Physician dashboard
+  - name: residents
+    description: Resident management
 paths:
   /healthz:
     get:
@@ -24,6 +30,75 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /residents:
+    get:
+      operationId: listResidents
+      tags: [residents]
+      summary: List all residents
+      responses:
+        "200":
+          description: List of residents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Resident"
+
+  /bowel-movements:
+    get:
+      operationId: listBowelMovements
+      tags: [bowelMovements]
+      summary: List bowel movement events
+      parameters:
+        - name: residentId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of bowel movement events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BowelMovement"
+    post:
+      operationId: createBowelMovement
+      tags: [bowelMovements]
+      summary: Record a bowel movement event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BowelMovementInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BowelMovement"
+        "400":
+          description: Validation error
+
+  /physician/summary:
+    get:
+      operationId: getPhysicianSummary
+      tags: [physician]
+      summary: Get physician population health summary
+      responses:
+        "200":
+          description: Physician summary with per-resident alert status and monthly stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhysicianSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +109,132 @@ components:
       required:
         - status
 
+    Resident:
+      type: object
+      required: [id, name, room]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        room:
+          type: string
+
+    BowelMovement:
+      type: object
+      required:
+        - id
+        - residentId
+        - bristolType
+        - amount
+        - incontinence
+        - bloodPresent
+        - mucusPresent
+        - painStraining
+        - clinicalNote
+        - createdAt
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        bristolType:
+          type: integer
+        amount:
+          type: string
+        incontinence:
+          type: boolean
+        bloodPresent:
+          type: boolean
+        mucusPresent:
+          type: boolean
+        painStraining:
+          type: boolean
+        clinicalNote:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    BowelMovementInput:
+      type: object
+      required:
+        - residentId
+        - bristolType
+        - amount
+        - incontinence
+        - bloodPresent
+        - mucusPresent
+        - painStraining
+        - clinicalNote
+      properties:
+        residentId:
+          type: integer
+        bristolType:
+          type: integer
+          minimum: 1
+          maximum: 7
+        amount:
+          type: string
+          enum: [Small, Medium, Large, XL]
+        incontinence:
+          type: boolean
+        bloodPresent:
+          type: boolean
+        mucusPresent:
+          type: boolean
+        painStraining:
+          type: boolean
+        clinicalNote:
+          type: string
+
+    ResidentAlertSummary:
+      type: object
+      required:
+        - residentId
+        - name
+        - room
+        - alertLevel
+        - lastBMAt
+        - hoursSinceLastBM
+        - monthlyGapCount
+        - monthlyBloodCount
+      properties:
+        residentId:
+          type: integer
+        name:
+          type: string
+        room:
+          type: string
+        alertLevel:
+          type: string
+          enum: [none, amber, red]
+        lastBMAt:
+          type: ["string", "null"]
+          format: date-time
+        hoursSinceLastBM:
+          type: ["number", "null"]
+        monthlyGapCount:
+          type: integer
+        monthlyBloodCount:
+          type: integer
+
+    PhysicianSummary:
+      type: object
+      required:
+        - residents
+        - facilityMonthlyGaps
+        - facilityMonthlyBlood
+        - generatedAt
+      properties:
+        residents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResidentAlertSummary"
+        facilityMonthlyGaps:
+          type: integer
+        facilityMonthlyBlood:
+          type: integer
+        generatedAt:
+          type: string
+          format: date-time

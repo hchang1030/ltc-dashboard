@@ -14,3 +14,73 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary List all residents
+ */
+export const ListResidentsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  room: zod.string(),
+});
+export const ListResidentsResponse = zod.array(ListResidentsResponseItem);
+
+/**
+ * @summary List bowel movement events
+ */
+export const ListBowelMovementsQueryParams = zod.object({
+  residentId: zod.coerce.number().optional(),
+});
+
+export const ListBowelMovementsResponseItem = zod.object({
+  id: zod.number(),
+  residentId: zod.number(),
+  bristolType: zod.number(),
+  amount: zod.string(),
+  incontinence: zod.boolean(),
+  bloodPresent: zod.boolean(),
+  mucusPresent: zod.boolean(),
+  painStraining: zod.boolean(),
+  clinicalNote: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const ListBowelMovementsResponse = zod.array(
+  ListBowelMovementsResponseItem,
+);
+
+/**
+ * @summary Record a bowel movement event
+ */
+export const createBowelMovementBodyBristolTypeMax = 7;
+
+export const CreateBowelMovementBody = zod.object({
+  residentId: zod.number(),
+  bristolType: zod.number().min(1).max(createBowelMovementBodyBristolTypeMax),
+  amount: zod.enum(["Small", "Medium", "Large", "XL"]),
+  incontinence: zod.boolean(),
+  bloodPresent: zod.boolean(),
+  mucusPresent: zod.boolean(),
+  painStraining: zod.boolean(),
+  clinicalNote: zod.string(),
+});
+
+/**
+ * @summary Get physician population health summary
+ */
+export const GetPhysicianSummaryResponse = zod.object({
+  residents: zod.array(
+    zod.object({
+      residentId: zod.number(),
+      name: zod.string(),
+      room: zod.string(),
+      alertLevel: zod.enum(["none", "amber", "red"]),
+      lastBMAt: zod.coerce.date().nullable(),
+      hoursSinceLastBM: zod.number().nullable(),
+      monthlyGapCount: zod.number(),
+      monthlyBloodCount: zod.number(),
+    }),
+  ),
+  facilityMonthlyGaps: zod.number(),
+  facilityMonthlyBlood: zod.number(),
+  generatedAt: zod.coerce.date(),
+});
