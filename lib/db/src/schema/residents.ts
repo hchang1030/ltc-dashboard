@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -7,6 +7,8 @@ export const residentsTable = pgTable("residents", {
   name: text("name").notNull(),
   room: text("room").notNull(),
   isFavorited: boolean("is_favorited").notNull().default(false),
+  dob: date("dob"),
+  phn: text("phn"),
 });
 
 export const insertResidentSchema = createInsertSchema(residentsTable).omit({ id: true });

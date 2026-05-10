@@ -22,8 +22,83 @@ export const ListResidentsResponseItem = zod.object({
   name: zod.string(),
   room: zod.string(),
   isFavorited: zod.boolean(),
+  dob: zod.coerce.date().nullish(),
+  phn: zod.string().nullish(),
 });
 export const ListResidentsResponse = zod.array(ListResidentsResponseItem);
+
+/**
+ * @summary List all fax directory entries
+ */
+export const ListFaxDirectoryResponseItem = zod.object({
+  id: zod.number(),
+  labelName: zod.string(),
+  faxNumber: zod.string(),
+});
+export const ListFaxDirectoryResponse = zod.array(ListFaxDirectoryResponseItem);
+
+/**
+ * @summary Create a new fax directory entry
+ */
+export const CreateFaxEntryBody = zod.object({
+  labelName: zod.string(),
+  faxNumber: zod.string(),
+});
+
+/**
+ * @summary Update a fax directory entry
+ */
+export const UpdateFaxEntryParams = zod.object({
+  entryId: zod.coerce.number(),
+});
+
+export const UpdateFaxEntryBody = zod.object({
+  labelName: zod.string(),
+  faxNumber: zod.string(),
+});
+
+export const UpdateFaxEntryResponse = zod.object({
+  id: zod.number(),
+  labelName: zod.string(),
+  faxNumber: zod.string(),
+});
+
+/**
+ * @summary Delete a fax directory entry
+ */
+export const DeleteFaxEntryParams = zod.object({
+  entryId: zod.coerce.number(),
+});
+
+/**
+ * @summary Send a fax (mock)
+ */
+export const SendFaxBody = zod.object({
+  residentId: zod.number(),
+  destinationLabel: zod.string(),
+  faxNumber: zod.string(),
+  noteContent: zod.string(),
+});
+
+/**
+ * @summary List fax history for a resident
+ */
+export const ListFaxHistoryParams = zod.object({
+  residentId: zod.coerce.number(),
+});
+
+export const ListFaxHistoryResponseItem = zod.object({
+  id: zod.number(),
+  residentId: zod.number(),
+  residentName: zod.string(),
+  residentRoom: zod.string(),
+  destinationLabel: zod.string(),
+  faxNumber: zod.string(),
+  noteContent: zod.string(),
+  timestamp: zod.coerce.date(),
+  status: zod.string(),
+});
+export const ListFaxHistoryResponse = zod.array(ListFaxHistoryResponseItem);
 
 /**
  * @summary Toggle a resident's favorited status
@@ -41,6 +116,8 @@ export const ToggleFavoriteResponse = zod.object({
   name: zod.string(),
   room: zod.string(),
   isFavorited: zod.boolean(),
+  dob: zod.coerce.date().nullish(),
+  phn: zod.string().nullish(),
 });
 
 /**

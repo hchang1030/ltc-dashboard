@@ -9,6 +9,8 @@ import fallRouter from "./fall";
 import vitalRouter from "./vital";
 import physicianRouter from "./physician";
 import communicationBinderRouter from "./communicationBinder";
+import faxDirectoryRouter from "./faxDirectory";
+import faxLogsRouter from "./faxLogs";
 
 const router: IRouter = Router();
 
@@ -22,5 +24,7 @@ router.use(fallRouter);
 router.use(vitalRouter);
 router.use(physicianRouter);
 router.use(communicationBinderRouter);
+router.use(faxDirectoryRouter);
+router.use(faxLogsRouter);
 
 export default router;

@@ -14,6 +14,10 @@ export interface Resident {
   name: string;
   room: string;
   isFavorited: boolean;
+  /** @nullable */
+  dob?: string | null;
+  /** @nullable */
+  phn?: string | null;
 }
 
 export interface FavoriteToggle {
@@ -277,6 +281,36 @@ export interface ResidentAlertSummary {
   behaviorEventCount24h: number;
   hasFall24h: boolean;
   hasAbnormalVital24h: boolean;
+}
+
+export interface FaxDirectoryEntry {
+  id: number;
+  labelName: string;
+  faxNumber: string;
+}
+
+export interface FaxDirectoryInput {
+  labelName: string;
+  faxNumber: string;
+}
+
+export interface FaxInput {
+  residentId: number;
+  destinationLabel: string;
+  faxNumber: string;
+  noteContent: string;
+}
+
+export interface FaxLog {
+  id: number;
+  residentId: number;
+  residentName: string;
+  residentRoom: string;
+  destinationLabel: string;
+  faxNumber: string;
+  noteContent: string;
+  timestamp: string;
+  status: string;
 }
 
 export interface BinderEntryInput {

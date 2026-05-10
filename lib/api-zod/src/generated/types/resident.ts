@@ -11,4 +11,8 @@ export interface Resident {
   name: string;
   room: string;
   isFavorited: boolean;
+  /** @nullable */
+  dob?: Date | null;
+  /** @nullable */
+  phn?: string | null;
 }

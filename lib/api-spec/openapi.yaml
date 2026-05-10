@@ -17,6 +17,8 @@ tags:
   - name: vitalEvents
   - name: physician
   - name: communicationBinder
+  - name: faxDirectory
+  - name: faxLogs
 
 paths:
   /healthz:
@@ -46,6 +48,116 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Resident"
+
+  /fax-directory:
+    get:
+      operationId: listFaxDirectory
+      tags: [faxDirectory]
+      summary: List all fax directory entries
+      responses:
+        "200":
+          description: List of fax directory entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FaxDirectoryEntry"
+    post:
+      operationId: createFaxEntry
+      tags: [faxDirectory]
+      summary: Create a new fax directory entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaxDirectoryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaxDirectoryEntry"
+
+  /fax-directory/{entryId}:
+    patch:
+      operationId: updateFaxEntry
+      tags: [faxDirectory]
+      summary: Update a fax directory entry
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaxDirectoryInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaxDirectoryEntry"
+    delete:
+      operationId: deleteFaxEntry
+      tags: [faxDirectory]
+      summary: Delete a fax directory entry
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /fax:
+    post:
+      operationId: sendFax
+      tags: [faxLogs]
+      summary: Send a fax (mock)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaxInput"
+      responses:
+        "201":
+          description: Fax log created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaxLog"
+
+  /residents/{residentId}/fax-history:
+    get:
+      operationId: listFaxHistory
+      tags: [faxLogs]
+      summary: List fax history for a resident
+      parameters:
+        - name: residentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of fax logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FaxLog"
 
   /residents/{residentId}/favorite:
     patch:
@@ -315,6 +427,11 @@ components:
           type: string
         isFavorited:
           type: boolean
+        dob:
+          type: ["string", "null"]
+          format: date
+        phn:
+          type: ["string", "null"]
 
     FavoriteToggle:
       type: object
@@ -647,6 +764,63 @@ components:
           type: boolean
         hasAbnormalVital24h:
           type: boolean
+
+    FaxDirectoryEntry:
+      type: object
+      required: [id, labelName, faxNumber]
+      properties:
+        id:
+          type: integer
+        labelName:
+          type: string
+        faxNumber:
+          type: string
+
+    FaxDirectoryInput:
+      type: object
+      required: [labelName, faxNumber]
+      properties:
+        labelName:
+          type: string
+        faxNumber:
+          type: string
+
+    FaxInput:
+      type: object
+      required: [residentId, destinationLabel, faxNumber, noteContent]
+      properties:
+        residentId:
+          type: integer
+        destinationLabel:
+          type: string
+        faxNumber:
+          type: string
+        noteContent:
+          type: string
+
+    FaxLog:
+      type: object
+      required: [id, residentId, residentName, residentRoom, destinationLabel, faxNumber, noteContent, timestamp, status]
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        residentName:
+          type: string
+        residentRoom:
+          type: string
+        destinationLabel:
+          type: string
+        faxNumber:
+          type: string
+        noteContent:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
 
     BinderEntryInput:
       type: object
