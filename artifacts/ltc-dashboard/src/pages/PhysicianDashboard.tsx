@@ -1828,8 +1828,6 @@ export default function PhysicianDashboard() {
                     <SortTh label="Room"              sortK="room"       currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Last BM"           sortK="lastBM"     currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Elapsed"           sortK="lastBM"     currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortTh label="48h Gaps (Mo.)"    sortK="gaps"       currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortTh label="Blood (Mo.)"       sortK="blood"      currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Clinical Alerts (24h)" sortK="alerts" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <th className="w-8" />
                   </tr>
@@ -1888,16 +1886,6 @@ export default function PhysicianDashboard() {
                         <td className="px-4 py-4">
                           <span className={["text-sm font-semibold font-mono whitespace-nowrap", isRed ? "text-red-400" : isAmber ? "text-amber-400" : "text-muted-foreground"].join(" ")}>
                             {formatHours(resident.hoursSinceLastBM)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <span className={["text-base font-bold", resident.monthlyGapCount > 0 ? "text-amber-400" : "text-muted-foreground"].join(" ")}>
-                            {resident.monthlyGapCount}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <span className={["text-base font-bold", resident.monthlyBloodCount > 0 ? "text-red-400" : "text-muted-foreground"].join(" ")}>
-                            {resident.monthlyBloodCount}
                           </span>
                         </td>
                         <td className="px-4 py-4">
