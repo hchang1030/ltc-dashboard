@@ -270,6 +270,10 @@ export interface ResidentAlertSummary {
   residentId: number;
   name: string;
   room: string;
+  /** @nullable */
+  phn?: string | null;
+  /** @nullable */
+  dob?: string | null;
   alertLevel: ResidentAlertSummaryAlertLevel;
   /** @nullable */
   lastBMAt: string | null;

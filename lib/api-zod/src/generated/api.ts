@@ -329,6 +329,8 @@ export const GetPhysicianSummaryResponse = zod.object({
       residentId: zod.number(),
       name: zod.string(),
       room: zod.string(),
+      phn: zod.string().nullish(),
+      dob: zod.coerce.date().nullish(),
       alertLevel: zod.enum(["none", "amber", "red"]),
       lastBMAt: zod.coerce.date().nullable(),
       hoursSinceLastBM: zod.number().nullable(),

@@ -164,6 +164,31 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
                 {resident?.name ?? "—"}
               </h2>
               <p className="text-xs text-muted-foreground">Room {resident?.room}</p>
+              {resident && (
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
+                  {resident.phn && (
+                    <span className="text-xs text-muted-foreground">
+                      <span className="font-semibold text-muted-foreground/70 uppercase tracking-wider text-[10px]">PHN </span>
+                      <span className="font-mono">{resident.phn}</span>
+                    </span>
+                  )}
+                  {resident.dob && (
+                    <span className="text-xs text-muted-foreground">
+                      <span className="font-semibold text-muted-foreground/70 uppercase tracking-wider text-[10px]">DOB </span>
+                      <span className="font-mono">{String(resident.dob).slice(0, 10)}</span>
+                      <span className="ml-1 text-muted-foreground/60">
+                        ({(() => {
+                          const d = new Date(String(resident.dob));
+                          const today = new Date();
+                          const age = today.getFullYear() - d.getFullYear() -
+                            (today < new Date(today.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0);
+                          return `${age}y`;
+                        })()})
+                      </span>
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <button

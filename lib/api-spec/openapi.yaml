@@ -925,6 +925,11 @@ components:
           type: string
         room:
           type: string
+        phn:
+          type: ["string", "null"]
+        dob:
+          type: ["string", "null"]
+          format: date
         alertLevel:
           type: string
           enum: [none, amber, red]

@@ -11,6 +11,10 @@ export interface ResidentAlertSummary {
   residentId: number;
   name: string;
   room: string;
+  /** @nullable */
+  phn?: string | null;
+  /** @nullable */
+  dob?: Date | null;
   alertLevel: ResidentAlertSummaryAlertLevel;
   /** @nullable */
   lastBMAt: Date | null;

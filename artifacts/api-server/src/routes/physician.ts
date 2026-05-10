@@ -142,6 +142,8 @@ router.get("/physician/summary", async (req, res): Promise<void> => {
         residentId: rid,
         name: resident.name,
         room: resident.room,
+        phn: resident.phn ?? null,
+        dob: resident.dob ?? null,
         alertLevel,
         lastBMAt: lastBMAt ? new Date(lastBMAt) : null,
         hoursSinceLastBM,
