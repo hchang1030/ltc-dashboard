@@ -850,6 +850,11 @@ export function CommHubView() {
   const [selectedContactId, setSelectedContactId] = useState<number | "custom" | null>(null);
   const [customValue, setCustomValue] = useState("");
   const [note, setNote] = useState("");
+  const [noteFormat, setNoteFormat] = useState<"free" | "sbar">("free");
+  const [sbarS, setSbarS] = useState("");
+  const [sbarB, setSbarB] = useState("");
+  const [sbarA, setSbarA] = useState("");
+  const [sbarR, setSbarR] = useState("");
   const [showPreview, setShowPreview] = useState(false);
 
   // ── Contact CRUD state ──
@@ -898,6 +903,17 @@ export function CommHubView() {
   useEffect(() => {
     setSelectedContactId(null);
   }, [method]);
+
+  // Auto-assemble SBAR fields into note string
+  useEffect(() => {
+    if (noteFormat !== "sbar") return;
+    const parts: string[] = [];
+    if (sbarS.trim()) parts.push(`S: ${sbarS.trim()}`);
+    if (sbarB.trim()) parts.push(`B: ${sbarB.trim()}`);
+    if (sbarA.trim()) parts.push(`A: ${sbarA.trim()}`);
+    if (sbarR.trim()) parts.push(`R: ${sbarR.trim()}`);
+    setNote(parts.join("\n"));
+  }, [sbarS, sbarB, sbarA, sbarR, noteFormat]);
 
   // ── Prefill from contact click ──
   const prefill = (entry: ContactDirectoryEntry) => {
@@ -1146,14 +1162,63 @@ export function CommHubView() {
 
               {/* Note */}
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clinical Note</p>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={7}
-                  placeholder={`Enter the message to send via ${method.toLowerCase()}…`}
-                  className="w-full bg-card border-2 border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 text-sm resize-none leading-relaxed"
-                />
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clinical Note</p>
+                  <div className="flex items-center gap-0.5 bg-muted/40 rounded-lg p-0.5">
+                    <button
+                      onClick={() => setNoteFormat("free")}
+                      className={["px-3 py-1 rounded-md text-xs font-bold transition-colors",
+                        noteFormat === "free" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"].join(" ")}
+                    >
+                      Free text
+                    </button>
+                    <button
+                      onClick={() => setNoteFormat("sbar")}
+                      className={["px-3 py-1 rounded-md text-xs font-bold transition-colors",
+                        noteFormat === "sbar" ? "bg-primary/20 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"].join(" ")}
+                    >
+                      SBAR
+                    </button>
+                  </div>
+                </div>
+                {noteFormat === "free" ? (
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={7}
+                    placeholder={`Enter the message to send via ${method.toLowerCase()}…`}
+                    className="w-full bg-card border-2 border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 text-sm resize-none leading-relaxed"
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {[
+                      { key: "S", label: "Situation", val: sbarS, set: setSbarS, placeholder: "What is happening right now with this resident?" },
+                      { key: "B", label: "Background", val: sbarB, set: setSbarB, placeholder: "Relevant history, medications, recent events…" },
+                      { key: "A", label: "Assessment", val: sbarA, set: setSbarA, placeholder: "Your clinical judgment of the situation…" },
+                      { key: "R", label: "Recommendation", val: sbarR, set: setSbarR, placeholder: "What action is being requested or recommended?" },
+                    ].map(({ key, label, val, set, placeholder }) => (
+                      <div key={key} className="flex gap-2.5">
+                        <div className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-[22px]">{key}</div>
+                        <div className="flex-1 space-y-0.5">
+                          <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">{label}</p>
+                          <textarea
+                            value={val}
+                            onChange={(e) => set(e.target.value)}
+                            rows={2}
+                            placeholder={placeholder}
+                            className="w-full bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 resize-none leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {note.trim() && (
+                      <div className="bg-muted/20 border border-border/50 rounded-xl p-3">
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 mb-1.5">Assembled Note</p>
+                        <p className="text-xs font-mono text-foreground/70 whitespace-pre-wrap leading-relaxed">{note}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground text-right">{note.length} characters</p>
               </div>
 
