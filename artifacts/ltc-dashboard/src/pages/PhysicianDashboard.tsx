@@ -137,7 +137,7 @@ function FaxComposerPanel({ residentId, residentName, residentRoom, dob, phn, on
   };
 
   return (
-    <div className="absolute inset-0 z-20 bg-card flex flex-col">
+    <div className="h-full bg-card flex flex-col border-l border-border shadow-2xl">
       {/* Composer header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0 bg-card">
         <div className="flex items-center gap-2">
@@ -384,7 +384,7 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
         data-testid="drill-panel"
         className={[
           "fixed top-0 right-0 h-full w-[560px] max-w-full bg-card border-l border-border z-50",
-          "flex flex-col shadow-2xl transition-transform duration-300 ease-in-out relative",
+          "flex flex-col shadow-2xl transition-transform duration-300 ease-in-out",
           isOpen ? "translate-x-0" : "translate-x-full",
         ].join(" ")}
       >
@@ -576,8 +576,15 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
           </div>
         )}
 
-        {/* Fax Composer Overlay */}
-        {composerOpen && resident && (
+      </aside>
+
+      {/* Fax Composer — fixed panel, same footprint as aside, higher z-index */}
+      {composerOpen && resident && (
+        <div className={[
+          "fixed top-0 right-0 h-full w-[560px] max-w-full z-[60]",
+          "transition-transform duration-300 ease-in-out",
+          isOpen ? "translate-x-0" : "translate-x-full",
+        ].join(" ")}>
           <FaxComposerPanel
             residentId={resident.residentId}
             residentName={resident.name}
@@ -590,8 +597,8 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
               setDrillTab("fax-history");
             }}
           />
-        )}
-      </aside>
+        </div>
+      )}
     </>
   );
 }
