@@ -555,7 +555,7 @@ function BowelTrackerSection({ residentId }: { residentId: number }) {
 }
 
 // ── Patient Overlay ───────────────────────────────────────────────────────────
-export function PatientOverlay({ resident, onClose }: { resident: OverlayResident | null; onClose: () => void }) {
+export function PatientOverlay({ resident, onClose, inline = false }: { resident: OverlayResident | null; onClose: () => void; inline?: boolean }) {
   const isOpen = resident !== null;
   const [showLabsDrawer, setShowLabsDrawer] = useState(false);
   const [vitalModal, setVitalModal] = useState<VitalKey | null>(null);
@@ -585,10 +585,11 @@ export function PatientOverlay({ resident, onClose }: { resident: OverlayResiden
   }, [resident?.residentId]);
 
   useEffect(() => {
+    if (inline) return;
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
+  }, [onClose, inline]);
 
   const lastV = vitals.at(-1);
 
@@ -611,8 +612,8 @@ export function PatientOverlay({ resident, onClose }: { resident: OverlayResiden
   return (
     <>
       <div
-        className="fixed inset-0 z-[95] bg-background text-foreground flex flex-col"
-        style={{ animation: "fadeIn 0.18s ease" }}
+        className={inline ? "bg-background text-foreground flex flex-col" : "fixed inset-0 z-[95] bg-background text-foreground flex flex-col"}
+        style={inline ? undefined : { animation: "fadeIn 0.18s ease" }}
       >
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <div className="shrink-0 bg-card border-b border-border px-6 py-3">
@@ -657,10 +658,12 @@ export function PatientOverlay({ resident, onClose }: { resident: OverlayResiden
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors">
                 <Printer className="w-3.5 h-3.5" />Hospital Transfer Pack
               </button>
-              <button onClick={onClose}
-                className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+              {!inline && (
+                <button onClick={onClose}
+                  className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -693,9 +696,9 @@ export function PatientOverlay({ resident, onClose }: { resident: OverlayResiden
         </div>
 
         {/* ── Body: 50/50 split ──────────────────────────────────────────────── */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className={inline ? "flex flex-col" : "flex-1 flex overflow-hidden"}>
           {/* Left half */}
-          <div className="flex-1 overflow-y-auto border-r border-border px-5 py-5 space-y-8">
+          <div className={inline ? "px-5 py-5 space-y-8 border-b border-border" : "flex-1 overflow-y-auto border-r border-border px-5 py-5 space-y-8"}>
             <ProgressNotesSection notes={notes} />
             <EMARTable meds={meds} emar={emar} />
             <ImmunizationsSection residentId={resident.residentId} />
@@ -708,7 +711,7 @@ export function PatientOverlay({ resident, onClose }: { resident: OverlayResiden
           </div>
 
           {/* Right half */}
-          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+          <div className={inline ? "px-5 py-5 space-y-6" : "flex-1 overflow-y-auto px-5 py-5 space-y-6"}>
             {/* Labs button */}
             <button onClick={() => setShowLabsDrawer(true)}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors font-bold text-sm">

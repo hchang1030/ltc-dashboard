@@ -397,7 +397,6 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [staffName, setStaffName] = useState("Frontline Staff");
-  const [overlayRes, setOverlayRes] = useState<OverlayResident | null>(null);
   const [showProgressNote, setShowProgressNote] = useState(false);
   const [progressNote, setProgressNote] = useState("");
   const createBinder = useCreateBinderEntry();
@@ -447,22 +446,8 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
           <BookOpen className="w-3.5 h-3.5" />
           Progress Note
         </button>
-        <button
-          onClick={() => setOverlayRes({
-            residentId: resident.id,
-            name: resident.name,
-            room: resident.room ?? null,
-            dob: resident.dob ? String(resident.dob).slice(0, 10) : null,
-          })}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary transition-colors text-xs font-bold shrink-0"
-        >
-          <FileText className="w-3.5 h-3.5" />
-          Full Record
-        </button>
         <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest shrink-0">Frontline Staff</span>
       </header>
-
-      <PatientOverlay resident={overlayRes} onClose={() => setOverlayRes(null)} />
 
       {/* Progress Note Sidebar */}
       {showProgressNote && (
@@ -641,6 +626,20 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
             ))}
           </div>
         )}
+
+        {/* Full Patient Record — inline below tapers */}
+        <div className="mt-8 rounded-2xl border border-border overflow-hidden">
+          <PatientOverlay
+            resident={{
+              residentId: resident.id,
+              name: resident.name,
+              room: resident.room ?? null,
+              dob: resident.dob ? String(resident.dob).slice(0, 10) : null,
+            }}
+            onClose={() => {}}
+            inline
+          />
+        </div>
       </main>
     </div>
   );

@@ -400,6 +400,15 @@ function DrillPanel({ resident, onClose, onOpenOverlay }: DrillPanelProps) {
             )}
             {!isEditing && (
               <button
+                onClick={() => { setNoteText(""); setShowNoteModal(true); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-colors text-xs font-bold"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Note
+              </button>
+            )}
+            {!isEditing && (
+              <button
                 onClick={openEdit}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors text-xs font-medium"
               >
