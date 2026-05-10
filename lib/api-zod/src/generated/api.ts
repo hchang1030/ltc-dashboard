@@ -28,77 +28,87 @@ export const ListResidentsResponseItem = zod.object({
 export const ListResidentsResponse = zod.array(ListResidentsResponseItem);
 
 /**
- * @summary List all fax directory entries
+ * @summary List all contact directory entries
  */
-export const ListFaxDirectoryResponseItem = zod.object({
+export const ListContactDirectoryResponseItem = zod.object({
   id: zod.number(),
   labelName: zod.string(),
-  faxNumber: zod.string(),
+  contactValue: zod.string(),
+  contactType: zod.enum(["Fax", "Email", "SMS"]),
 });
-export const ListFaxDirectoryResponse = zod.array(ListFaxDirectoryResponseItem);
+export const ListContactDirectoryResponse = zod.array(
+  ListContactDirectoryResponseItem,
+);
 
 /**
- * @summary Create a new fax directory entry
+ * @summary Create a new contact directory entry
  */
-export const CreateFaxEntryBody = zod.object({
+export const CreateContactEntryBody = zod.object({
   labelName: zod.string(),
-  faxNumber: zod.string(),
+  contactValue: zod.string(),
+  contactType: zod.enum(["Fax", "Email", "SMS"]),
 });
 
 /**
- * @summary Update a fax directory entry
+ * @summary Update a contact directory entry
  */
-export const UpdateFaxEntryParams = zod.object({
+export const UpdateContactEntryParams = zod.object({
   entryId: zod.coerce.number(),
 });
 
-export const UpdateFaxEntryBody = zod.object({
+export const UpdateContactEntryBody = zod.object({
   labelName: zod.string(),
-  faxNumber: zod.string(),
+  contactValue: zod.string(),
+  contactType: zod.enum(["Fax", "Email", "SMS"]),
 });
 
-export const UpdateFaxEntryResponse = zod.object({
+export const UpdateContactEntryResponse = zod.object({
   id: zod.number(),
   labelName: zod.string(),
-  faxNumber: zod.string(),
+  contactValue: zod.string(),
+  contactType: zod.enum(["Fax", "Email", "SMS"]),
 });
 
 /**
- * @summary Delete a fax directory entry
+ * @summary Delete a contact directory entry
  */
-export const DeleteFaxEntryParams = zod.object({
+export const DeleteContactEntryParams = zod.object({
   entryId: zod.coerce.number(),
 });
 
 /**
- * @summary Send a fax (mock)
+ * @summary Send a communication (mock)
  */
-export const SendFaxBody = zod.object({
+export const SendCommunicationBody = zod.object({
   residentId: zod.number(),
   destinationLabel: zod.string(),
-  faxNumber: zod.string(),
+  contactValue: zod.string(),
+  method: zod.enum(["Fax", "Email", "SMS"]),
   noteContent: zod.string(),
 });
 
 /**
- * @summary List fax history for a resident
+ * @summary List communications, optionally filtered by resident
  */
-export const ListFaxHistoryParams = zod.object({
-  residentId: zod.coerce.number(),
+export const ListCommunicationsQueryParams = zod.object({
+  residentId: zod.coerce.number().optional(),
 });
 
-export const ListFaxHistoryResponseItem = zod.object({
+export const ListCommunicationsResponseItem = zod.object({
   id: zod.number(),
   residentId: zod.number(),
   residentName: zod.string(),
   residentRoom: zod.string(),
   destinationLabel: zod.string(),
-  faxNumber: zod.string(),
+  contactValue: zod.string(),
+  method: zod.enum(["Fax", "Email", "SMS"]),
   noteContent: zod.string(),
   timestamp: zod.coerce.date(),
   status: zod.string(),
 });
-export const ListFaxHistoryResponse = zod.array(ListFaxHistoryResponseItem);
+export const ListCommunicationsResponse = zod.array(
+  ListCommunicationsResponseItem,
+);
 
 /**
  * @summary Toggle a resident's favorited status

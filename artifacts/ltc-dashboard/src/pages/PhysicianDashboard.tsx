@@ -6,18 +6,18 @@ import {
   useResolveBinderEntry,
   useUndoBinderEntry,
   getListBinderEntriesQueryKey,
-  useListFaxDirectory,
-  useCreateFaxEntry,
-  useUpdateFaxEntry,
-  useDeleteFaxEntry,
-  useSendFax,
-  useListFaxHistory,
-  getListFaxHistoryQueryKey,
-  getListFaxDirectoryQueryKey,
+  useListContactDirectory,
+  useCreateContactEntry,
+  useUpdateContactEntry,
+  useDeleteContactEntry,
+  useSendCommunication,
+  useListCommunications,
+  getListContactDirectoryQueryKey,
+  getListCommunicationsQueryKey,
   useListResidents,
   getListResidentsQueryKey,
 } from "@workspace/api-client-react";
-import type { ResidentAlertSummary, BinderEntry, FaxDirectoryEntry, FaxLog } from "@workspace/api-client-react";
+import type { ResidentAlertSummary, BinderEntry, ContactDirectoryEntry, CommunicationLog } from "@workspace/api-client-react";
 import {
   Clock,
   RefreshCw,
@@ -38,7 +38,8 @@ import {
   BookOpen,
   Plus,
   ArrowLeft,
-  Phone,
+  Mail,
+  Smartphone,
 } from "lucide-react";
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -88,216 +89,6 @@ const BRISTOL_COLORS: Record<number, { dot: string; label: string; text: string 
   7: { dot: "bg-[#efebe9]", label: "Entirely liquid",     text: "text-[#1a1a1a]" },
 };
 
-// ── Fax Composer Panel ────────────────────────────────────────────────────────
-
-interface FaxComposerPanelProps {
-  residentId: number;
-  residentName: string;
-  residentRoom: string;
-  dob: string | null | undefined;
-  phn: string | null | undefined;
-  onClose: () => void;
-  onSent: () => void;
-}
-
-function FaxComposerPanel({ residentId, residentName, residentRoom, dob, phn, onClose, onSent }: FaxComposerPanelProps) {
-  const [destinationId, setDestinationId] = useState<number | "custom">("custom");
-  const [customFaxNumber, setCustomFaxNumber] = useState("");
-  const [note, setNote] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const { data: directory = [] } = useListFaxDirectory();
-  const sendFax = useSendFax();
-
-  const selectedEntry = typeof destinationId === "number" ? directory.find((d) => d.id === destinationId) : null;
-  const destinationLabel = selectedEntry ? selectedEntry.labelName : "Custom";
-  const faxNumber = selectedEntry ? selectedEntry.faxNumber : customFaxNumber;
-  const canGenerate = note.trim().length > 0 && (selectedEntry !== undefined || customFaxNumber.trim().length > 0);
-
-  const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  const dobDisplay = dob
-    ? new Date(dob + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-    : "Not on file";
-  const phnDisplay = phn ?? "Not on file";
-
-  const handleSend = () => {
-    sendFax.mutate(
-      { data: { residentId, destinationLabel, faxNumber, noteContent: note } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListFaxHistoryQueryKey(residentId) });
-          toast({ title: "Fax sent!", description: `Transmission logged as '${destinationLabel}'. Status: Sent (Mock)` });
-          onSent();
-        },
-        onError: () => toast({ title: "Send failed", variant: "destructive" }),
-      },
-    );
-  };
-
-  return (
-    <div className="h-full bg-card flex flex-col border-l border-border shadow-2xl">
-      {/* Composer header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0 bg-card">
-        <div className="flex items-center gap-2">
-          <Printer className="w-5 h-5 text-primary" />
-          <span className="font-bold text-foreground">Fax Composer</span>
-          <span className="text-muted-foreground text-sm">— {residentName}</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        {!showPreview ? (
-          /* ── Compose Form ── */
-          <div className="p-6 space-y-5">
-            {/* Destination */}
-            <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Destination</p>
-              <select
-                value={destinationId === "custom" ? "custom" : String(destinationId)}
-                onChange={(e) =>
-                  setDestinationId(e.target.value === "custom" ? "custom" : parseInt(e.target.value))
-                }
-                className="w-full bg-card border-2 border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary/60 text-sm appearance-none"
-              >
-                {directory.map((d) => (
-                  <option key={d.id} value={String(d.id)} className="bg-card">
-                    {d.labelName} — {d.faxNumber}
-                  </option>
-                ))}
-                <option value="custom" className="bg-card">Custom Number…</option>
-              </select>
-            </div>
-
-            {destinationId === "custom" && (
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Fax Number</p>
-                <div className="flex items-center gap-3 bg-card border-2 border-border rounded-xl px-4 py-3 focus-within:border-primary/60">
-                  <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <input
-                    type="text"
-                    value={customFaxNumber}
-                    onChange={(e) => setCustomFaxNumber(e.target.value)}
-                    placeholder="e.g. 1-800-555-0000"
-                    className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none text-sm"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Resident info preview */}
-            <div className="bg-muted/30 border border-border/60 rounded-xl px-4 py-3 space-y-1">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Resident (auto-filled)</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                <span className="text-muted-foreground">Name:</span>
-                <span className="text-foreground font-medium">{residentName}</span>
-                <span className="text-muted-foreground">Room:</span>
-                <span className="text-foreground font-medium">{residentRoom}</span>
-                <span className="text-muted-foreground">DOB:</span>
-                <span className={dob ? "text-foreground font-medium" : "text-muted-foreground/60 italic"}>{dobDisplay}</span>
-                <span className="text-muted-foreground">PHN:</span>
-                <span className={phn ? "text-foreground font-medium" : "text-muted-foreground/60 italic"}>{phnDisplay}</span>
-              </div>
-            </div>
-
-            {/* Note */}
-            <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clinical Note</p>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={7}
-                placeholder="Enter the physician's clinical note, referral instructions, or message..."
-                className="w-full bg-card border-2 border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 text-sm resize-none leading-relaxed"
-              />
-              <p className="text-xs text-muted-foreground text-right">{note.length} characters</p>
-            </div>
-
-            <button
-              onClick={() => setShowPreview(true)}
-              disabled={!canGenerate}
-              className="w-full min-h-[60px] rounded-xl font-bold text-base border-2 border-primary bg-primary/20 text-primary hover:bg-primary/30 transition-all flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Printer className="w-5 h-5" />
-              Generate Cover Sheet
-            </button>
-          </div>
-        ) : (
-          /* ── Cover Sheet Preview ── */
-          <div className="p-6 space-y-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Cover Sheet Preview</p>
-
-            {/* The document */}
-            <div className="bg-white text-gray-900 rounded-xl border-2 border-border shadow-lg p-6 font-mono text-xs space-y-4">
-              {/* Letterhead */}
-              <div className="text-center space-y-0.5 border-b-2 border-gray-900 pb-3">
-                <p className="font-bold text-base tracking-wide">FACSIMILE TRANSMISSION</p>
-                <p className="text-gray-600">Long-Term Care Facility — Confidential</p>
-              </div>
-
-              {/* Routing grid */}
-              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-                <span className="font-bold">TO:</span>       <span>{destinationLabel}</span>
-                <span className="font-bold">FAX:</span>      <span>{faxNumber}</span>
-                <span className="font-bold">FROM:</span>     <span>Attending Physician</span>
-                <span className="font-bold">DATE:</span>     <span>{today}</span>
-              </div>
-
-              <div className="border-t border-gray-300" />
-
-              {/* Patient block */}
-              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-                <span className="font-bold">PATIENT:</span> <span className="font-bold">{residentName}</span>
-                <span className="font-bold">ROOM:</span>    <span>{residentRoom}</span>
-                <span className="font-bold">DOB:</span>     <span>{dobDisplay}</span>
-                <span className="font-bold">PHN:</span>     <span>{phnDisplay}</span>
-              </div>
-
-              <div className="border-t border-gray-300" />
-
-              {/* Note */}
-              <div className="space-y-2">
-                <p className="font-bold uppercase tracking-wide">Clinical Note:</p>
-                <p className="whitespace-pre-wrap leading-relaxed text-gray-800">{note}</p>
-              </div>
-
-              <div className="border-t border-gray-200 pt-2 text-center text-gray-400">
-                <p>*** CONFIDENTIAL — FOR INTENDED RECIPIENT ONLY ***</p>
-              </div>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowPreview(false)}
-                className="flex-1 min-h-[52px] rounded-xl font-bold border-2 border-border text-muted-foreground hover:bg-muted transition-all flex items-center justify-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Edit
-              </button>
-              <button
-                onClick={handleSend}
-                disabled={sendFax.isPending}
-                className="flex-[2] min-h-[52px] rounded-xl font-bold border-2 border-primary bg-primary/20 text-primary hover:bg-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-                {sendFax.isPending ? "Sending…" : "Confirm & Send 📠"}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ── Drill-down Panel ──────────────────────────────────────────────────────────
 
 interface DrillPanelProps {
@@ -307,71 +98,36 @@ interface DrillPanelProps {
 
 function DrillPanel({ resident, onClose }: DrillPanelProps) {
   const isOpen = resident !== null;
-  const [drillTab, setDrillTab] = useState<"bm-history" | "fax-history">("bm-history");
-  const [composerOpen, setComposerOpen] = useState(false);
-  const queryClient = useQueryClient();
 
   const { data: events = [], isLoading } = useListBowelMovements(
     { residentId: resident?.residentId },
     { query: { enabled: !!resident, queryKey: [`/api/bowel-movements`, { residentId: resident?.residentId }] } },
   );
 
-  const { data: faxLogs = [], isLoading: faxLoading } = useListFaxHistory(
-    resident?.residentId ?? 0,
-    { query: { enabled: !!resident, queryKey: getListFaxHistoryQueryKey(resident?.residentId ?? 0) } },
-  );
-
-  const { data: residents = [] } = useListResidents({ query: { enabled: !!resident, queryKey: getListResidentsQueryKey() } });
-  const fullResident = residents.find((r) => r.id === resident?.residentId);
-
   // sorted newest first
   const sorted = [...events].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
-  // Reset tabs when resident changes
-  useEffect(() => {
-    setDrillTab("bm-history");
-    setComposerOpen(false);
-  }, [resident?.residentId]);
-
   // close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (composerOpen) setComposerOpen(false);
-        else onClose();
-      }
+      if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose, composerOpen]);
+  }, [onClose]);
 
   const isRed   = resident?.alertLevel === "red";
   const isAmber = resident?.alertLevel === "amber";
   const nameCls = isRed ? "text-red-400" : isAmber ? "text-amber-400" : "text-foreground";
   const alertDot = isRed ? "bg-red-500" : isAmber ? "bg-amber-400" : "bg-emerald-500";
 
-  const tabBtn = (tab: typeof drillTab, label: string, icon: ReactNode) => (
-    <button
-      onClick={() => setDrillTab(tab)}
-      className={[
-        "flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap",
-        drillTab === tab
-          ? "border-primary text-primary"
-          : "border-transparent text-muted-foreground hover:text-foreground",
-      ].join(" ")}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-
   return (
     <>
       {/* Backdrop */}
       <div
-        onClick={() => { if (composerOpen) setComposerOpen(false); else onClose(); }}
+        onClick={onClose}
         className={[
           "fixed inset-0 z-40 bg-black/50 transition-opacity duration-300",
           isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
@@ -399,22 +155,13 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
               <p className="text-xs text-muted-foreground">Room {resident?.room}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setComposerOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-sm bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              Send Fax
-            </button>
-            <button
-              onClick={onClose}
-              data-testid="btn-drill-close"
-              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            data-testid="btn-drill-close"
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Alert strip */}
@@ -454,321 +201,762 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
               <span className="text-primary font-bold text-sm">{events.length}</span>
               <span className="text-muted-foreground text-xs">BMs recorded</span>
             </div>
-            <div className="flex items-center gap-2 bg-sky-500/10 border border-sky-500/25 rounded-lg px-3 py-1.5">
-              <Printer className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-sky-400 font-bold text-sm">{faxLogs.length}</span>
-              <span className="text-muted-foreground text-xs">faxes sent</span>
-            </div>
           </div>
         )}
 
-        {/* Tab bar */}
-        <div className="flex border-b border-border shrink-0 px-2 overflow-x-auto">
-          {tabBtn("bm-history", "BM History", <Activity className="w-3.5 h-3.5" />)}
-          {tabBtn("fax-history", "Fax History", <Printer className="w-3.5 h-3.5" />)}
-        </div>
-
-        {/* ── BM History Tab ── */}
-        {drillTab === "bm-history" && (
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            {isLoading && (
-              <p className="text-muted-foreground text-center py-12">Loading history...</p>
-            )}
-            {!isLoading && sorted.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                <div className="bg-muted/40 p-5 rounded-full">
-                  <Activity className="w-8 h-8 text-muted-foreground/50" />
-                </div>
-                <p className="text-muted-foreground font-medium">No bowel movements recorded yet</p>
-                <p className="text-muted-foreground/60 text-sm">Use the Care Aide view to log the first entry.</p>
+        {/* BM History */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {isLoading && (
+            <p className="text-muted-foreground text-center py-12">Loading history...</p>
+          )}
+          {!isLoading && sorted.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+              <div className="bg-muted/40 p-5 rounded-full">
+                <Activity className="w-8 h-8 text-muted-foreground/50" />
               </div>
-            )}
-            {sorted.map((bm, idx) => {
-              const bristol = BRISTOL_COLORS[bm.bristolType] ?? BRISTOL_COLORS[4];
-              const hasFlags = bm.incontinence || bm.bloodPresent || bm.mucusPresent || bm.painStraining;
-              const isFirst = idx === 0;
-              return (
-                <div
-                  key={bm.id}
-                  data-testid={`drill-event-${bm.id}`}
-                  className={["rounded-xl border p-4 space-y-3", isFirst ? "border-primary/40 bg-primary/5" : "border-border bg-background/60"].join(" ")}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {formatFull(bm.createdAt)}
-                      {isFirst && (
-                        <span className="ml-2 text-primary font-bold uppercase tracking-wider text-[10px] bg-primary/15 px-2 py-0.5 rounded-full">Most recent</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className={["w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0", bristol.dot, bristol.text].join(" ")}>
-                      {bm.bristolType}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground text-sm">Type {bm.bristolType} &nbsp;·&nbsp; {bristol.label}</p>
-                      <p className="text-muted-foreground text-sm">Amount: <span className="font-medium text-foreground">{bm.amount}</span></p>
-                    </div>
-                  </div>
-                  {hasFlags && (
-                    <div className="flex flex-wrap gap-2">
-                      {bm.incontinence && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">Incontinence</span>}
-                      {bm.bloodPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-600/20 text-red-400 border border-red-600/30">Blood Present</span>}
-                      {bm.mucusPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Mucus Present</span>}
-                      {bm.painStraining && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">Pain / Straining</span>}
-                    </div>
-                  )}
-                  {bm.clinicalNote && (
-                    <p className="text-xs font-mono text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 leading-relaxed border border-border/50">{bm.clinicalNote}</p>
-                  )}
+              <p className="text-muted-foreground font-medium">No bowel movements recorded yet</p>
+              <p className="text-muted-foreground/60 text-sm">Use the Care Aide view to log the first entry.</p>
+            </div>
+          )}
+          {sorted.map((bm, idx) => {
+            const bristol = BRISTOL_COLORS[bm.bristolType] ?? BRISTOL_COLORS[4];
+            const hasFlags = bm.incontinence || bm.bloodPresent || bm.mucusPresent || bm.painStraining;
+            const isFirst = idx === 0;
+            return (
+              <div
+                key={bm.id}
+                data-testid={`drill-event-${bm.id}`}
+                className={["rounded-xl border p-4 space-y-3", isFirst ? "border-primary/40 bg-primary/5" : "border-border bg-background/60"].join(" ")}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {formatFull(bm.createdAt)}
+                    {isFirst && (
+                      <span className="ml-2 text-primary font-bold uppercase tracking-wider text-[10px] bg-primary/15 px-2 py-0.5 rounded-full">Most recent</span>
+                    )}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <div className="flex items-center gap-3">
+                  <div className={["w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0", bristol.dot, bristol.text].join(" ")}>
+                    {bm.bristolType}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground text-sm">Type {bm.bristolType} &nbsp;·&nbsp; {bristol.label}</p>
+                    <p className="text-muted-foreground text-sm">Amount: <span className="font-medium text-foreground">{bm.amount}</span></p>
+                  </div>
+                </div>
+                {hasFlags && (
+                  <div className="flex flex-wrap gap-2">
+                    {bm.incontinence && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">Incontinence</span>}
+                    {bm.bloodPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-600/20 text-red-400 border border-red-600/30">Blood Present</span>}
+                    {bm.mucusPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Mucus Present</span>}
+                    {bm.painStraining && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">Pain / Straining</span>}
+                  </div>
+                )}
+                {bm.clinicalNote && (
+                  <p className="text-xs font-mono text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 leading-relaxed border border-border/50">{bm.clinicalNote}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+    </>
+  );
+}
 
-        {/* ── Fax History Tab ── */}
-        {drillTab === "fax-history" && (
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            {faxLoading && (
-              <p className="text-muted-foreground text-center py-12">Loading fax history...</p>
-            )}
-            {!faxLoading && faxLogs.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                <div className="bg-muted/40 p-5 rounded-full">
-                  <Printer className="w-8 h-8 text-muted-foreground/50" />
-                </div>
-                <p className="text-muted-foreground font-medium">No faxes sent yet</p>
-                <p className="text-muted-foreground/60 text-sm">Use the Send Fax button to transmit a document.</p>
-                <button
-                  onClick={() => setComposerOpen(true)}
-                  className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 transition-colors"
+// ── Comm Hub ─────────────────────────────────────────────────────────────────
+
+type CommMethod = "Fax" | "Email" | "SMS";
+
+function MethodIcon({ method, className }: { method: CommMethod; className?: string }) {
+  const cls = className ?? "w-4 h-4";
+  if (method === "Fax") return <Printer className={cls} />;
+  if (method === "Email") return <Mail className={cls} />;
+  return <Smartphone className={cls} />;
+}
+
+function CommHubView() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // ── Composer state ──
+  const [selectedResidentId, setSelectedResidentId] = useState<number | null>(null);
+  const [method, setMethod] = useState<CommMethod>("Fax");
+  const [selectedContactId, setSelectedContactId] = useState<number | "custom" | null>(null);
+  const [customValue, setCustomValue] = useState("");
+  const [note, setNote] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
+
+  // ── Contact CRUD state ──
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editValue, setEditValue] = useState("");
+  const [editType, setEditType] = useState<CommMethod>("Fax");
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [newType, setNewType] = useState<CommMethod>("Fax");
+
+  // ── Data ──
+  const { data: residents = [] } = useListResidents({ query: { queryKey: getListResidentsQueryKey() } });
+  const { data: contacts = [], isLoading: contactsLoading } = useListContactDirectory({
+    query: { queryKey: getListContactDirectoryQueryKey() },
+  });
+  const { data: commsHistory = [], isLoading: historyLoading } = useListCommunications(
+    {},
+    { query: { queryKey: getListCommunicationsQueryKey() } },
+  );
+
+  const createEntry = useCreateContactEntry();
+  const updateEntry = useUpdateContactEntry();
+  const deleteEntry = useDeleteContactEntry();
+  const sendComm = useSendCommunication();
+
+  const invalidateContacts = () =>
+    queryClient.invalidateQueries({ queryKey: getListContactDirectoryQueryKey() });
+  const invalidateHistory = () =>
+    queryClient.invalidateQueries({ queryKey: getListCommunicationsQueryKey() });
+
+  // ── Derived ──
+  const filteredContacts = contacts.filter((c) => c.contactType === method);
+  const selectedContact =
+    typeof selectedContactId === "number" ? contacts.find((c) => c.id === selectedContactId) : null;
+  const contactValue = selectedContact ? selectedContact.contactValue : customValue;
+  const destinationLabel = selectedContact ? selectedContact.labelName : "Custom";
+  const selectedResident = residents.find((r) => r.id === selectedResidentId);
+  const canGenerate =
+    !!selectedResidentId &&
+    note.trim().length > 0 &&
+    (selectedContact != null || customValue.trim().length > 0);
+
+  // Reset contact when method changes
+  useEffect(() => {
+    setSelectedContactId(null);
+  }, [method]);
+
+  // ── Prefill from contact click ──
+  const prefill = (entry: ContactDirectoryEntry) => {
+    setMethod(entry.contactType as CommMethod);
+    setSelectedContactId(entry.id);
+  };
+
+  // ── Send ──
+  const handleSend = () => {
+    if (!selectedResidentId) return;
+    sendComm.mutate(
+      {
+        data: {
+          residentId: selectedResidentId,
+          destinationLabel,
+          contactValue,
+          method,
+          noteContent: note,
+        },
+      },
+      {
+        onSuccess: () => {
+          navigator.clipboard.writeText(note).catch(() => {});
+          toast({ title: "Sent & Note Copied to Clipboard" });
+          invalidateHistory();
+          setShowPreview(false);
+          setNote("");
+          setSelectedContactId(null);
+          setCustomValue("");
+        },
+        onError: () => toast({ title: "Send failed", variant: "destructive" }),
+      },
+    );
+  };
+
+  // ── CRUD handlers ──
+  const handleAddContact = () => {
+    if (!newLabel.trim() || !newValue.trim()) return;
+    createEntry.mutate(
+      { data: { labelName: newLabel.trim(), contactValue: newValue.trim(), contactType: newType } },
+      {
+        onSuccess: () => {
+          invalidateContacts();
+          setAdding(false);
+          setNewLabel("");
+          setNewValue("");
+          setNewType("Fax");
+          toast({ title: "Contact added" });
+        },
+        onError: () => toast({ title: "Failed to add contact", variant: "destructive" }),
+      },
+    );
+  };
+
+  const handleUpdateContact = (id: number) => {
+    if (!editLabel.trim() || !editValue.trim()) return;
+    updateEntry.mutate(
+      { entryId: id, data: { labelName: editLabel.trim(), contactValue: editValue.trim(), contactType: editType } },
+      {
+        onSuccess: () => {
+          invalidateContacts();
+          setEditingId(null);
+          toast({ title: "Contact updated" });
+        },
+        onError: () => toast({ title: "Failed to update contact", variant: "destructive" }),
+      },
+    );
+  };
+
+  const handleDeleteContact = (id: number, label: string) => {
+    deleteEntry.mutate(
+      { entryId: id },
+      {
+        onSuccess: () => {
+          invalidateContacts();
+          if (selectedContactId === id) setSelectedContactId(null);
+          toast({ title: `'${label}' removed` });
+        },
+        onError: () => toast({ title: "Failed to delete contact", variant: "destructive" }),
+      },
+    );
+  };
+
+  const startEdit = (entry: ContactDirectoryEntry) => {
+    setEditingId(entry.id);
+    setEditLabel(entry.labelName);
+    setEditValue(entry.contactValue);
+    setEditType(entry.contactType as CommMethod);
+    setAdding(false);
+  };
+
+  const inputCls =
+    "w-full bg-card border-2 border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60";
+
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const methodTabCls = (m: CommMethod) => {
+    const active = method === m;
+    const base =
+      "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm border-2 transition-all";
+    if (!active) return `${base} bg-card border-border text-muted-foreground hover:border-primary/40`;
+    if (m === "Fax") return `${base} bg-sky-900/40 border-sky-500 text-sky-200`;
+    if (m === "Email") return `${base} bg-violet-900/40 border-violet-500 text-violet-200`;
+    return `${base} bg-emerald-900/40 border-emerald-600 text-emerald-200`;
+  };
+
+  const typeTabCls = (m: CommMethod, active: boolean) => {
+    const base =
+      "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold border transition-all";
+    return active
+      ? `${base} bg-primary/20 border-primary/50 text-primary`
+      : `${base} bg-card border-border text-muted-foreground`;
+  };
+
+  const iconColorCls = (m: string) =>
+    m === "Fax" ? "text-sky-400" : m === "Email" ? "text-violet-400" : "text-emerald-400";
+  const iconBgCls = (m: string) =>
+    m === "Fax" ? "bg-sky-900/30" : m === "Email" ? "bg-violet-900/30" : "bg-emerald-900/30";
+  const methodBadgeCls = (m: string) => {
+    const base =
+      "inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border";
+    if (m === "Fax") return `${base} bg-sky-900/40 text-sky-300 border-sky-700/40`;
+    if (m === "Email") return `${base} bg-violet-900/40 text-violet-300 border-violet-700/40`;
+    return `${base} bg-emerald-900/40 text-emerald-300 border-emerald-700/40`;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* ── Top row: Composer + Contacts ── */}
+      <div className="grid grid-cols-[1fr_360px] gap-6 items-start">
+
+        {/* ── Composer card ── */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border bg-muted/20 flex items-center gap-2">
+            <Send className="w-4 h-4 text-primary" />
+            <h2 className="font-bold text-sm text-foreground">Compose & Send</h2>
+          </div>
+
+          {!showPreview ? (
+            <div className="p-5 space-y-5">
+
+              {/* Resident picker */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Resident</p>
+                <select
+                  value={selectedResidentId ?? ""}
+                  onChange={(e) =>
+                    setSelectedResidentId(e.target.value ? parseInt(e.target.value) : null)
+                  }
+                  className="w-full bg-card border-2 border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary/60 text-sm appearance-none"
                 >
-                  <Printer className="w-4 h-4" />
-                  Open Fax Composer
+                  <option value="" className="bg-card">— Select resident —</option>
+                  {residents.map((r) => (
+                    <option key={r.id} value={r.id} className="bg-card">
+                      {r.name} — Room {r.room}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Method selector */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Method</p>
+                <div className="flex gap-2">
+                  {(["Fax", "Email", "SMS"] as CommMethod[]).map((m) => (
+                    <button key={m} onClick={() => setMethod(m)} className={methodTabCls(m)}>
+                      <MethodIcon method={m} />
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recipient */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Recipient
+                  {filteredContacts.length > 0 && (
+                    <span className="ml-2 normal-case font-normal text-muted-foreground/60">
+                      — click a contact on the right to pre-fill
+                    </span>
+                  )}
+                </p>
+                <select
+                  value={
+                    selectedContactId === "custom"
+                      ? "custom"
+                      : selectedContactId !== null
+                      ? String(selectedContactId)
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setSelectedContactId(
+                      e.target.value === "custom"
+                        ? "custom"
+                        : e.target.value
+                        ? parseInt(e.target.value)
+                        : null,
+                    )
+                  }
+                  className="w-full bg-card border-2 border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary/60 text-sm appearance-none"
+                >
+                  <option value="" className="bg-card">— Choose from contacts —</option>
+                  {filteredContacts.map((c) => (
+                    <option key={c.id} value={String(c.id)} className="bg-card">
+                      {c.labelName} — {c.contactValue}
+                    </option>
+                  ))}
+                  <option value="custom" className="bg-card">Custom…</option>
+                </select>
+              </div>
+
+              {(selectedContactId === "custom" || selectedContactId === null) && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Custom{" "}
+                    {method === "Fax"
+                      ? "Fax Number"
+                      : method === "Email"
+                      ? "Email Address"
+                      : "Phone Number"}
+                  </p>
+                  <div className="flex items-center gap-3 bg-card border-2 border-border rounded-xl px-4 py-3 focus-within:border-primary/60">
+                    <MethodIcon method={method} className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <input
+                      type="text"
+                      value={customValue}
+                      onChange={(e) => setCustomValue(e.target.value)}
+                      placeholder={
+                        method === "Fax"
+                          ? "e.g. 1-800-555-0000"
+                          : method === "Email"
+                          ? "e.g. dr.jones@hospital.ca"
+                          : "e.g. +1-604-555-1234"
+                      }
+                      className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Note */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clinical Note</p>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={7}
+                  placeholder={`Enter the message to send via ${method.toLowerCase()}…`}
+                  className="w-full bg-card border-2 border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 text-sm resize-none leading-relaxed"
+                />
+                <p className="text-xs text-muted-foreground text-right">{note.length} characters</p>
+              </div>
+
+              <button
+                onClick={() => setShowPreview(true)}
+                disabled={!canGenerate}
+                className="w-full min-h-[56px] rounded-xl font-bold text-base border-2 border-primary bg-primary/20 text-primary hover:bg-primary/30 transition-all flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <MethodIcon method={method} className="w-5 h-5" />
+                Generate Preview
+              </button>
+            </div>
+          ) : (
+            /* ── Preview ── */
+            <div className="p-5 space-y-5">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                {method} Preview
+              </p>
+
+              {method === "Fax" && (
+                <div className="bg-white text-gray-900 rounded-xl border-2 border-border shadow-lg p-6 font-mono text-xs space-y-4">
+                  <div className="text-center space-y-0.5 border-b-2 border-gray-900 pb-3">
+                    <p className="font-bold text-base tracking-wide">FACSIMILE TRANSMISSION</p>
+                    <p className="text-gray-600">Long-Term Care Facility — Confidential</p>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+                    <span className="font-bold">TO:</span>   <span>{destinationLabel}</span>
+                    <span className="font-bold">FAX:</span>  <span>{contactValue}</span>
+                    <span className="font-bold">FROM:</span> <span>Attending Physician</span>
+                    <span className="font-bold">DATE:</span> <span>{today}</span>
+                  </div>
+                  <div className="border-t border-gray-300" />
+                  <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+                    <span className="font-bold">PATIENT:</span>{" "}
+                    <span className="font-bold">{selectedResident?.name ?? "—"}</span>
+                    <span className="font-bold">ROOM:</span> <span>{selectedResident?.room ?? "—"}</span>
+                  </div>
+                  <div className="border-t border-gray-300" />
+                  <div className="space-y-2">
+                    <p className="font-bold uppercase tracking-wide">Clinical Note:</p>
+                    <p className="whitespace-pre-wrap leading-relaxed text-gray-800">{note}</p>
+                  </div>
+                  <div className="border-t border-gray-200 pt-2 text-center text-gray-400">
+                    <p>*** CONFIDENTIAL — FOR INTENDED RECIPIENT ONLY ***</p>
+                  </div>
+                </div>
+              )}
+
+              {method === "Email" && (
+                <div className="bg-card border-2 border-border rounded-xl text-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-muted/30 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                    <span className="text-muted-foreground font-bold">To:</span>
+                    <span className="text-foreground font-mono">{contactValue || "—"}</span>
+                    <span className="text-muted-foreground font-bold">From:</span>
+                    <span className="text-foreground">Attending Physician (LTC Facility)</span>
+                    <span className="text-muted-foreground font-bold">Subject:</span>
+                    <span className="text-foreground">
+                      Patient Update — {selectedResident?.name ?? "—"}, Room{" "}
+                      {selectedResident?.room ?? "—"}
+                    </span>
+                    <span className="text-muted-foreground font-bold">Date:</span>
+                    <span className="text-muted-foreground">{today}</span>
+                  </div>
+                  <div className="px-4 py-4">
+                    <p className="whitespace-pre-wrap text-foreground text-sm leading-relaxed">{note}</p>
+                  </div>
+                </div>
+              )}
+
+              {method === "SMS" && (
+                <div className="bg-muted/20 border border-border rounded-xl p-4 space-y-2">
+                  <p className="text-xs text-muted-foreground font-mono">To: {contactValue || "—"}</p>
+                  <div className="bg-emerald-900/30 border border-emerald-700/40 rounded-2xl rounded-tl-none px-4 py-3 max-w-[80%]">
+                    <p className="text-emerald-100 text-sm leading-relaxed whitespace-pre-wrap">{note}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Patient: {selectedResident?.name ?? "—"}, Room {selectedResident?.room ?? "—"}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="flex-1 min-h-[52px] rounded-xl font-bold border-2 border-border text-muted-foreground hover:bg-muted transition-all flex items-center justify-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Edit
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={sendComm.isPending}
+                  className="flex-[2] min-h-[52px] rounded-xl font-bold border-2 border-primary bg-primary/20 text-primary hover:bg-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <MethodIcon method={method} className="w-4 h-4" />
+                  {sendComm.isPending ? "Sending…" : "Confirm Send & Copy Note"}
                 </button>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Contacts card ── */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border bg-muted/20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-primary" />
+              <h2 className="font-bold text-sm text-foreground">Contacts</h2>
+              {contacts.length > 0 && (
+                <span className="text-xs bg-muted border border-border rounded-full px-2 py-0.5 text-muted-foreground">
+                  {contacts.length}
+                </span>
+              )}
+            </div>
+            {!adding && (
+              <button
+                onClick={() => { setAdding(true); setEditingId(null); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add
+              </button>
             )}
-            {faxLogs.map((log) => (
-              <div key={log.id} className="rounded-xl border border-border bg-card p-4 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <Printer className="w-3.5 h-3.5 text-sky-400" />
-                      <span className="font-bold text-sm text-foreground">{log.destinationLabel}</span>
+          </div>
+
+          <div className="divide-y divide-border">
+            {contactsLoading && (
+              <p className="text-muted-foreground text-center py-8 text-sm">Loading contacts…</p>
+            )}
+
+            {/* Add form */}
+            {adding && (
+              <div className="p-4 bg-primary/5 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-primary">New Contact</p>
+                <input
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  placeholder="Label (e.g. Pharmacy)"
+                  className={inputCls}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  {(["Fax", "Email", "SMS"] as CommMethod[]).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setNewType(m)}
+                      className={typeTabCls(m, newType === m)}
+                    >
+                      <MethodIcon method={m} className="w-3 h-3" />
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={newValue}
+                  onChange={(e) => setNewValue(e.target.value)}
+                  placeholder={
+                    newType === "Fax"
+                      ? "Fax number"
+                      : newType === "Email"
+                      ? "Email address"
+                      : "Phone number"
+                  }
+                  className={inputCls}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddContact}
+                    disabled={createEntry.isPending || !newLabel.trim() || !newValue.trim()}
+                    className="px-4 py-1.5 rounded-lg font-bold text-sm bg-primary/20 border border-primary/40 text-primary hover:bg-primary/30 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add
+                  </button>
+                  <button
+                    onClick={() => { setAdding(false); setNewLabel(""); setNewValue(""); setNewType("Fax"); }}
+                    className="px-4 py-1.5 rounded-lg font-bold text-sm border border-border text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!contactsLoading && contacts.length === 0 && !adding && (
+              <div className="flex flex-col items-center justify-center py-12 gap-3 text-center px-4">
+                <div className="bg-muted/40 p-4 rounded-full">
+                  <BookOpen className="w-6 h-6 text-muted-foreground/50" />
+                </div>
+                <p className="text-muted-foreground font-medium text-sm">No contacts yet</p>
+                <p className="text-muted-foreground/60 text-xs">
+                  Add destinations like Pharmacy, Specialist, or Hospital.
+                </p>
+              </div>
+            )}
+
+            {contacts.map((entry) => (
+              <div key={entry.id} className="p-4">
+                {editingId === entry.id ? (
+                  <div className="space-y-3">
+                    <input
+                      value={editLabel}
+                      onChange={(e) => setEditLabel(e.target.value)}
+                      placeholder="Label"
+                      className={inputCls}
+                    />
+                    <div className="flex gap-2">
+                      {(["Fax", "Email", "SMS"] as CommMethod[]).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setEditType(m)}
+                          className={typeTabCls(m, editType === m)}
+                        >
+                          <MethodIcon method={m} className="w-3 h-3" />
+                          {m}
+                        </button>
+                      ))}
                     </div>
-                    <p className="text-xs font-mono text-muted-foreground">{log.faxNumber}</p>
+                    <input
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      placeholder={
+                        editType === "Fax"
+                          ? "Fax number"
+                          : editType === "Email"
+                          ? "Email address"
+                          : "Phone number"
+                      }
+                      className={inputCls}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleUpdateContact(entry.id)}
+                        disabled={updateEntry.isPending}
+                        className="px-4 py-1.5 rounded-lg font-bold text-sm bg-primary/20 border border-primary/40 text-primary hover:bg-primary/30 transition-colors disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="px-4 py-1.5 rounded-lg font-bold text-sm border border-border text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      onClick={() => prefill(entry)}
+                      className="flex items-center gap-3 min-w-0 flex-1 text-left group/contact"
+                      title="Click to pre-fill composer"
+                    >
+                      <div className={["p-2 rounded-lg shrink-0", iconBgCls(entry.contactType)].join(" ")}>
+                        <MethodIcon
+                          method={entry.contactType as CommMethod}
+                          className={["w-4 h-4", iconColorCls(entry.contactType)].join(" ")}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-foreground text-sm truncate group-hover/contact:text-primary transition-colors">
+                          {entry.labelName}
+                        </p>
+                        <p className="text-muted-foreground text-xs font-mono truncate">
+                          {entry.contactValue}
+                        </p>
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => startEdit(entry)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteContact(entry.id, entry.labelName)}
+                        disabled={deleteEntry.isPending}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-950/30 transition-colors disabled:opacity-50"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── History ── */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-border bg-muted/20 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-primary" />
+          <h2 className="font-bold text-sm text-foreground">Communication History</h2>
+          {commsHistory.length > 0 && (
+            <span className="text-xs bg-muted border border-border rounded-full px-2 py-0.5 text-muted-foreground">
+              {commsHistory.length}
+            </span>
+          )}
+        </div>
+
+        {historyLoading && (
+          <p className="text-muted-foreground text-center py-8 text-sm">Loading history…</p>
+        )}
+
+        {!historyLoading && commsHistory.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+            <div className="bg-muted/40 p-4 rounded-full">
+              <Send className="w-6 h-6 text-muted-foreground/50" />
+            </div>
+            <p className="text-muted-foreground font-medium text-sm">No communications yet</p>
+            <p className="text-muted-foreground/60 text-xs">
+              Use the Compose section above to send a message.
+            </p>
+          </div>
+        )}
+
+        {commsHistory.length > 0 && (
+          <div className="divide-y divide-border">
+            {commsHistory.map((log: CommunicationLog) => (
+              <div key={log.id} className="flex items-start gap-4 px-5 py-4">
+                <div className={["p-2 rounded-lg shrink-0 mt-0.5", iconBgCls(log.method)].join(" ")}>
+                  <MethodIcon
+                    method={log.method as CommMethod}
+                    className={["w-4 h-4", iconColorCls(log.method)].join(" ")}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-foreground">{log.residentName}</span>
+                    <span className="text-muted-foreground text-xs font-mono">Room {log.residentRoom}</span>
+                    <span className="text-muted-foreground text-xs">→</span>
+                    <span className="font-semibold text-sm text-foreground">{log.destinationLabel}</span>
+                    <span className="text-muted-foreground text-xs font-mono truncate max-w-[160px]">
+                      {log.contactValue}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className={methodBadgeCls(log.method)}>{log.method}</span>
                     <span className="text-xs bg-emerald-900/40 text-emerald-400 border border-emerald-700/40 px-2 py-0.5 rounded-full font-bold">
                       {log.status}
                     </span>
-                    <p className="text-xs text-muted-foreground font-mono mt-1">
-                      {new Date(log.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </p>
+                    <span className="text-xs text-muted-foreground font-mono ml-auto">
+                      {new Date(log.timestamp).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
                   </div>
-                </div>
-                <div className="bg-muted/30 rounded-lg px-3 py-2 border border-border/50">
-                  <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">{log.noteContent}</p>
+                  {log.noteContent && (
+                    <p className="text-xs text-muted-foreground mt-2 line-clamp-2 leading-relaxed font-mono bg-muted/30 rounded px-2 py-1">
+                      {log.noteContent}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
-
-      </aside>
-
-      {/* Fax Composer — fixed panel, same footprint as aside, higher z-index */}
-      {composerOpen && resident && (
-        <div className={[
-          "fixed top-0 right-0 h-full w-[560px] max-w-full z-[60]",
-          "transition-transform duration-300 ease-in-out",
-          isOpen ? "translate-x-0" : "translate-x-full",
-        ].join(" ")}>
-          <FaxComposerPanel
-            residentId={resident.residentId}
-            residentName={resident.name}
-            residentRoom={resident.room}
-            dob={fullResident?.dob}
-            phn={fullResident?.phn}
-            onClose={() => setComposerOpen(false)}
-            onSent={() => {
-              setComposerOpen(false);
-              setDrillTab("fax-history");
-            }}
-          />
-        </div>
-      )}
-    </>
-  );
-}
-
-// ── Fax Directory View ────────────────────────────────────────────────────────
-
-function FaxDirectoryView() {
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editLabel, setEditLabel] = useState("");
-  const [editFax, setEditFax] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [newLabel, setNewLabel] = useState("");
-  const [newFax, setNewFax] = useState("");
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  const { data: directory = [], isLoading } = useListFaxDirectory({
-    query: { queryKey: getListFaxDirectoryQueryKey() },
-  });
-  const createEntry = useCreateFaxEntry();
-  const updateEntry = useUpdateFaxEntry();
-  const deleteEntry = useDeleteFaxEntry();
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListFaxDirectoryQueryKey() });
-
-  const handleAdd = () => {
-    if (!newLabel.trim() || !newFax.trim()) return;
-    createEntry.mutate({ data: { labelName: newLabel.trim(), faxNumber: newFax.trim() } }, {
-      onSuccess: () => { invalidate(); setAdding(false); setNewLabel(""); setNewFax(""); toast({ title: "Entry added" }); },
-      onError: () => toast({ title: "Failed to add entry", variant: "destructive" }),
-    });
-  };
-
-  const handleUpdate = (id: number) => {
-    if (!editLabel.trim() || !editFax.trim()) return;
-    updateEntry.mutate({ entryId: id, data: { labelName: editLabel.trim(), faxNumber: editFax.trim() } }, {
-      onSuccess: () => { invalidate(); setEditingId(null); toast({ title: "Entry updated" }); },
-      onError: () => toast({ title: "Failed to update entry", variant: "destructive" }),
-    });
-  };
-
-  const handleDelete = (id: number, label: string) => {
-    deleteEntry.mutate({ entryId: id }, {
-      onSuccess: () => { invalidate(); toast({ title: `'${label}' removed` }); },
-      onError: () => toast({ title: "Failed to delete entry", variant: "destructive" }),
-    });
-  };
-
-  const startEdit = (entry: FaxDirectoryEntry) => {
-    setEditingId(entry.id);
-    setEditLabel(entry.labelName);
-    setEditFax(entry.faxNumber);
-    setAdding(false);
-  };
-
-  const inputCls = "flex-1 bg-card border-2 border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60";
-
-  return (
-    <section className="space-y-6 max-w-2xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Fax Directory</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage destinations for outgoing physician faxes</p>
-        </div>
-        {!adding && (
-          <button
-            onClick={() => { setAdding(true); setEditingId(null); }}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-primary/15 border-2 border-primary/30 text-primary hover:bg-primary/25 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Entry
-          </button>
-        )}
       </div>
-
-      {isLoading && <p className="text-muted-foreground text-center py-8">Loading directory…</p>}
-
-      {/* Entry list */}
-      <div className="space-y-3">
-        {directory.map((entry) => (
-          <div key={entry.id} className="bg-card border border-border rounded-xl p-4">
-            {editingId === entry.id ? (
-              /* Edit row */
-              <div className="space-y-3">
-                <div className="flex gap-3">
-                  <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} placeholder="Label name" className={inputCls} />
-                  <input value={editFax} onChange={(e) => setEditFax(e.target.value)} placeholder="Fax number" className={inputCls} />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleUpdate(entry.id)}
-                    disabled={updateEntry.isPending}
-                    className="px-4 py-1.5 rounded-lg font-bold text-sm bg-primary/20 border border-primary/40 text-primary hover:bg-primary/30 transition-colors disabled:opacity-50"
-                  >
-                    Save
-                  </button>
-                  <button onClick={() => setEditingId(null)} className="px-4 py-1.5 rounded-lg font-bold text-sm border border-border text-muted-foreground hover:bg-muted transition-colors">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Read row */
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="bg-primary/10 p-2 rounded-lg shrink-0">
-                    <Phone className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-foreground text-sm truncate">{entry.labelName}</p>
-                    <p className="text-muted-foreground text-xs font-mono">{entry.faxNumber}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => startEdit(entry)}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    title="Edit"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(entry.id, entry.labelName)}
-                    disabled={deleteEntry.isPending}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-950/30 transition-colors disabled:opacity-50"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-
-        {!isLoading && directory.length === 0 && !adding && (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 text-center bg-card border border-border rounded-xl">
-            <div className="bg-muted/40 p-4 rounded-full">
-              <BookOpen className="w-7 h-7 text-muted-foreground/50" />
-            </div>
-            <p className="text-muted-foreground font-medium">No directory entries yet</p>
-            <p className="text-muted-foreground/60 text-sm">Add destinations like Pharmacy, Emergency Dept, or Specialists.</p>
-          </div>
-        )}
-
-        {/* Add form */}
-        {adding && (
-          <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-primary">New Entry</p>
-            <div className="flex gap-3">
-              <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Label (e.g. Pharmacy)" className={inputCls} autoFocus />
-              <input value={newFax} onChange={(e) => setNewFax(e.target.value)} placeholder="Fax number" className={inputCls} />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleAdd}
-                disabled={createEntry.isPending || !newLabel.trim() || !newFax.trim()}
-                className="px-4 py-1.5 rounded-lg font-bold text-sm bg-primary/20 border border-primary/40 text-primary hover:bg-primary/30 transition-colors disabled:opacity-50 flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add
-              </button>
-              <button onClick={() => { setAdding(false); setNewLabel(""); setNewFax(""); }} className="px-4 py-1.5 rounded-lg font-bold text-sm border border-border text-muted-foreground hover:bg-muted transition-colors">
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </section>
+    </div>
   );
 }
 
@@ -1057,19 +1245,19 @@ export default function PhysicianDashboard() {
             className={[
               "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
               view === "directory"
-                ? "bg-violet-700/20 border-violet-500 text-violet-300 shadow-sm"
-                : "bg-card border-border text-muted-foreground hover:border-violet-500/40",
+                ? "bg-teal-700/20 border-teal-500 text-teal-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-teal-500/40",
             ].join(" ")}
           >
-            <BookOpen className="w-4 h-4" />
-            Fax Directory
+            <Send className="w-4 h-4" />
+            Comm Hub
           </button>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto p-8 space-y-8">
         {view === "binder" && <VirtualBinder />}
-        {view === "directory" && <FaxDirectoryView />}
+        {view === "directory" && <CommHubView />}
 
         {view === "population" && alertCounts && (
           <section className="grid grid-cols-3 gap-4">

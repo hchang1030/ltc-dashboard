@@ -23,18 +23,19 @@ import type {
   BinderEntryInput,
   BowelMovement,
   BowelMovementInput,
+  CommunicationInput,
+  CommunicationLog,
+  ContactDirectoryEntry,
+  ContactDirectoryInput,
   FallEvent,
   FallEventInput,
   FavoriteToggle,
-  FaxDirectoryEntry,
-  FaxDirectoryInput,
-  FaxInput,
-  FaxLog,
   HealthStatus,
   IntakeEvent,
   IntakeEventInput,
   ListBinderEntriesParams,
   ListBowelMovementsParams,
+  ListCommunicationsParams,
   PainEvent,
   PainEventInput,
   PhysicianSummary,
@@ -203,31 +204,31 @@ export function useListResidents<
 }
 
 /**
- * @summary List all fax directory entries
+ * @summary List all contact directory entries
  */
-export const getListFaxDirectoryUrl = () => {
-  return `/api/fax-directory`;
+export const getListContactDirectoryUrl = () => {
+  return `/api/contact-directory`;
 };
 
-export const listFaxDirectory = async (
+export const listContactDirectory = async (
   options?: RequestInit,
-): Promise<FaxDirectoryEntry[]> => {
-  return customFetch<FaxDirectoryEntry[]>(getListFaxDirectoryUrl(), {
+): Promise<ContactDirectoryEntry[]> => {
+  return customFetch<ContactDirectoryEntry[]>(getListContactDirectoryUrl(), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListFaxDirectoryQueryKey = () => {
-  return [`/api/fax-directory`] as const;
+export const getListContactDirectoryQueryKey = () => {
+  return [`/api/contact-directory`] as const;
 };
 
-export const getListFaxDirectoryQueryOptions = <
-  TData = Awaited<ReturnType<typeof listFaxDirectory>>,
+export const getListContactDirectoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof listContactDirectory>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listFaxDirectory>>,
+    Awaited<ReturnType<typeof listContactDirectory>>,
     TError,
     TData
   >;
@@ -235,40 +236,40 @@ export const getListFaxDirectoryQueryOptions = <
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListFaxDirectoryQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListContactDirectoryQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listFaxDirectory>>
-  > = ({ signal }) => listFaxDirectory({ signal, ...requestOptions });
+    Awaited<ReturnType<typeof listContactDirectory>>
+  > = ({ signal }) => listContactDirectory({ signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listFaxDirectory>>,
+    Awaited<ReturnType<typeof listContactDirectory>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type ListFaxDirectoryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listFaxDirectory>>
+export type ListContactDirectoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listContactDirectory>>
 >;
-export type ListFaxDirectoryQueryError = ErrorType<unknown>;
+export type ListContactDirectoryQueryError = ErrorType<unknown>;
 
 /**
- * @summary List all fax directory entries
+ * @summary List all contact directory entries
  */
 
-export function useListFaxDirectory<
-  TData = Awaited<ReturnType<typeof listFaxDirectory>>,
+export function useListContactDirectory<
+  TData = Awaited<ReturnType<typeof listContactDirectory>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listFaxDirectory>>,
+    Awaited<ReturnType<typeof listContactDirectory>>,
     TError,
     TData
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListFaxDirectoryQueryOptions(options);
+  const queryOptions = getListContactDirectoryQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -278,42 +279,42 @@ export function useListFaxDirectory<
 }
 
 /**
- * @summary Create a new fax directory entry
+ * @summary Create a new contact directory entry
  */
-export const getCreateFaxEntryUrl = () => {
-  return `/api/fax-directory`;
+export const getCreateContactEntryUrl = () => {
+  return `/api/contact-directory`;
 };
 
-export const createFaxEntry = async (
-  faxDirectoryInput: FaxDirectoryInput,
+export const createContactEntry = async (
+  contactDirectoryInput: ContactDirectoryInput,
   options?: RequestInit,
-): Promise<FaxDirectoryEntry> => {
-  return customFetch<FaxDirectoryEntry>(getCreateFaxEntryUrl(), {
+): Promise<ContactDirectoryEntry> => {
+  return customFetch<ContactDirectoryEntry>(getCreateContactEntryUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(faxDirectoryInput),
+    body: JSON.stringify(contactDirectoryInput),
   });
 };
 
-export const getCreateFaxEntryMutationOptions = <
+export const getCreateContactEntryMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createFaxEntry>>,
+    Awaited<ReturnType<typeof createContactEntry>>,
     TError,
-    { data: BodyType<FaxDirectoryInput> },
+    { data: BodyType<ContactDirectoryInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof createFaxEntry>>,
+  Awaited<ReturnType<typeof createContactEntry>>,
   TError,
-  { data: BodyType<FaxDirectoryInput> },
+  { data: BodyType<ContactDirectoryInput> },
   TContext
 > => {
-  const mutationKey = ["createFaxEntry"];
+  const mutationKey = ["createContactEntry"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -323,84 +324,84 @@ export const getCreateFaxEntryMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createFaxEntry>>,
-    { data: BodyType<FaxDirectoryInput> }
+    Awaited<ReturnType<typeof createContactEntry>>,
+    { data: BodyType<ContactDirectoryInput> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return createFaxEntry(data, requestOptions);
+    return createContactEntry(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type CreateFaxEntryMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createFaxEntry>>
+export type CreateContactEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createContactEntry>>
 >;
-export type CreateFaxEntryMutationBody = BodyType<FaxDirectoryInput>;
-export type CreateFaxEntryMutationError = ErrorType<unknown>;
+export type CreateContactEntryMutationBody = BodyType<ContactDirectoryInput>;
+export type CreateContactEntryMutationError = ErrorType<unknown>;
 
 /**
- * @summary Create a new fax directory entry
+ * @summary Create a new contact directory entry
  */
-export const useCreateFaxEntry = <
+export const useCreateContactEntry = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createFaxEntry>>,
+    Awaited<ReturnType<typeof createContactEntry>>,
     TError,
-    { data: BodyType<FaxDirectoryInput> },
+    { data: BodyType<ContactDirectoryInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof createFaxEntry>>,
+  Awaited<ReturnType<typeof createContactEntry>>,
   TError,
-  { data: BodyType<FaxDirectoryInput> },
+  { data: BodyType<ContactDirectoryInput> },
   TContext
 > => {
-  return useMutation(getCreateFaxEntryMutationOptions(options));
+  return useMutation(getCreateContactEntryMutationOptions(options));
 };
 
 /**
- * @summary Update a fax directory entry
+ * @summary Update a contact directory entry
  */
-export const getUpdateFaxEntryUrl = (entryId: number) => {
-  return `/api/fax-directory/${entryId}`;
+export const getUpdateContactEntryUrl = (entryId: number) => {
+  return `/api/contact-directory/${entryId}`;
 };
 
-export const updateFaxEntry = async (
+export const updateContactEntry = async (
   entryId: number,
-  faxDirectoryInput: FaxDirectoryInput,
+  contactDirectoryInput: ContactDirectoryInput,
   options?: RequestInit,
-): Promise<FaxDirectoryEntry> => {
-  return customFetch<FaxDirectoryEntry>(getUpdateFaxEntryUrl(entryId), {
+): Promise<ContactDirectoryEntry> => {
+  return customFetch<ContactDirectoryEntry>(getUpdateContactEntryUrl(entryId), {
     ...options,
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(faxDirectoryInput),
+    body: JSON.stringify(contactDirectoryInput),
   });
 };
 
-export const getUpdateFaxEntryMutationOptions = <
+export const getUpdateContactEntryMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateFaxEntry>>,
+    Awaited<ReturnType<typeof updateContactEntry>>,
     TError,
-    { entryId: number; data: BodyType<FaxDirectoryInput> },
+    { entryId: number; data: BodyType<ContactDirectoryInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof updateFaxEntry>>,
+  Awaited<ReturnType<typeof updateContactEntry>>,
   TError,
-  { entryId: number; data: BodyType<FaxDirectoryInput> },
+  { entryId: number; data: BodyType<ContactDirectoryInput> },
   TContext
 > => {
-  const mutationKey = ["updateFaxEntry"];
+  const mutationKey = ["updateContactEntry"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -410,81 +411,81 @@ export const getUpdateFaxEntryMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateFaxEntry>>,
-    { entryId: number; data: BodyType<FaxDirectoryInput> }
+    Awaited<ReturnType<typeof updateContactEntry>>,
+    { entryId: number; data: BodyType<ContactDirectoryInput> }
   > = (props) => {
     const { entryId, data } = props ?? {};
 
-    return updateFaxEntry(entryId, data, requestOptions);
+    return updateContactEntry(entryId, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type UpdateFaxEntryMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateFaxEntry>>
+export type UpdateContactEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateContactEntry>>
 >;
-export type UpdateFaxEntryMutationBody = BodyType<FaxDirectoryInput>;
-export type UpdateFaxEntryMutationError = ErrorType<unknown>;
+export type UpdateContactEntryMutationBody = BodyType<ContactDirectoryInput>;
+export type UpdateContactEntryMutationError = ErrorType<unknown>;
 
 /**
- * @summary Update a fax directory entry
+ * @summary Update a contact directory entry
  */
-export const useUpdateFaxEntry = <
+export const useUpdateContactEntry = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateFaxEntry>>,
+    Awaited<ReturnType<typeof updateContactEntry>>,
     TError,
-    { entryId: number; data: BodyType<FaxDirectoryInput> },
+    { entryId: number; data: BodyType<ContactDirectoryInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof updateFaxEntry>>,
+  Awaited<ReturnType<typeof updateContactEntry>>,
   TError,
-  { entryId: number; data: BodyType<FaxDirectoryInput> },
+  { entryId: number; data: BodyType<ContactDirectoryInput> },
   TContext
 > => {
-  return useMutation(getUpdateFaxEntryMutationOptions(options));
+  return useMutation(getUpdateContactEntryMutationOptions(options));
 };
 
 /**
- * @summary Delete a fax directory entry
+ * @summary Delete a contact directory entry
  */
-export const getDeleteFaxEntryUrl = (entryId: number) => {
-  return `/api/fax-directory/${entryId}`;
+export const getDeleteContactEntryUrl = (entryId: number) => {
+  return `/api/contact-directory/${entryId}`;
 };
 
-export const deleteFaxEntry = async (
+export const deleteContactEntry = async (
   entryId: number,
   options?: RequestInit,
 ): Promise<void> => {
-  return customFetch<void>(getDeleteFaxEntryUrl(entryId), {
+  return customFetch<void>(getDeleteContactEntryUrl(entryId), {
     ...options,
     method: "DELETE",
   });
 };
 
-export const getDeleteFaxEntryMutationOptions = <
+export const getDeleteContactEntryMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteFaxEntry>>,
+    Awaited<ReturnType<typeof deleteContactEntry>>,
     TError,
     { entryId: number },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteFaxEntry>>,
+  Awaited<ReturnType<typeof deleteContactEntry>>,
   TError,
   { entryId: number },
   TContext
 > => {
-  const mutationKey = ["deleteFaxEntry"];
+  const mutationKey = ["deleteContactEntry"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -494,83 +495,83 @@ export const getDeleteFaxEntryMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteFaxEntry>>,
+    Awaited<ReturnType<typeof deleteContactEntry>>,
     { entryId: number }
   > = (props) => {
     const { entryId } = props ?? {};
 
-    return deleteFaxEntry(entryId, requestOptions);
+    return deleteContactEntry(entryId, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type DeleteFaxEntryMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteFaxEntry>>
+export type DeleteContactEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteContactEntry>>
 >;
 
-export type DeleteFaxEntryMutationError = ErrorType<unknown>;
+export type DeleteContactEntryMutationError = ErrorType<unknown>;
 
 /**
- * @summary Delete a fax directory entry
+ * @summary Delete a contact directory entry
  */
-export const useDeleteFaxEntry = <
+export const useDeleteContactEntry = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteFaxEntry>>,
+    Awaited<ReturnType<typeof deleteContactEntry>>,
     TError,
     { entryId: number },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof deleteFaxEntry>>,
+  Awaited<ReturnType<typeof deleteContactEntry>>,
   TError,
   { entryId: number },
   TContext
 > => {
-  return useMutation(getDeleteFaxEntryMutationOptions(options));
+  return useMutation(getDeleteContactEntryMutationOptions(options));
 };
 
 /**
- * @summary Send a fax (mock)
+ * @summary Send a communication (mock)
  */
-export const getSendFaxUrl = () => {
-  return `/api/fax`;
+export const getSendCommunicationUrl = () => {
+  return `/api/communications`;
 };
 
-export const sendFax = async (
-  faxInput: FaxInput,
+export const sendCommunication = async (
+  communicationInput: CommunicationInput,
   options?: RequestInit,
-): Promise<FaxLog> => {
-  return customFetch<FaxLog>(getSendFaxUrl(), {
+): Promise<CommunicationLog> => {
+  return customFetch<CommunicationLog>(getSendCommunicationUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(faxInput),
+    body: JSON.stringify(communicationInput),
   });
 };
 
-export const getSendFaxMutationOptions = <
+export const getSendCommunicationMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof sendFax>>,
+    Awaited<ReturnType<typeof sendCommunication>>,
     TError,
-    { data: BodyType<FaxInput> },
+    { data: BodyType<CommunicationInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof sendFax>>,
+  Awaited<ReturnType<typeof sendCommunication>>,
   TError,
-  { data: BodyType<FaxInput> },
+  { data: BodyType<CommunicationInput> },
   TContext
 > => {
-  const mutationKey = ["sendFax"];
+  const mutationKey = ["sendCommunication"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -580,75 +581,89 @@ export const getSendFaxMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof sendFax>>,
-    { data: BodyType<FaxInput> }
+    Awaited<ReturnType<typeof sendCommunication>>,
+    { data: BodyType<CommunicationInput> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return sendFax(data, requestOptions);
+    return sendCommunication(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type SendFaxMutationResult = NonNullable<
-  Awaited<ReturnType<typeof sendFax>>
+export type SendCommunicationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendCommunication>>
 >;
-export type SendFaxMutationBody = BodyType<FaxInput>;
-export type SendFaxMutationError = ErrorType<unknown>;
+export type SendCommunicationMutationBody = BodyType<CommunicationInput>;
+export type SendCommunicationMutationError = ErrorType<unknown>;
 
 /**
- * @summary Send a fax (mock)
+ * @summary Send a communication (mock)
  */
-export const useSendFax = <
+export const useSendCommunication = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof sendFax>>,
+    Awaited<ReturnType<typeof sendCommunication>>,
     TError,
-    { data: BodyType<FaxInput> },
+    { data: BodyType<CommunicationInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof sendFax>>,
+  Awaited<ReturnType<typeof sendCommunication>>,
   TError,
-  { data: BodyType<FaxInput> },
+  { data: BodyType<CommunicationInput> },
   TContext
 > => {
-  return useMutation(getSendFaxMutationOptions(options));
+  return useMutation(getSendCommunicationMutationOptions(options));
 };
 
 /**
- * @summary List fax history for a resident
+ * @summary List communications, optionally filtered by resident
  */
-export const getListFaxHistoryUrl = (residentId: number) => {
-  return `/api/residents/${residentId}/fax-history`;
+export const getListCommunicationsUrl = (params?: ListCommunicationsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/communications?${stringifiedParams}`
+    : `/api/communications`;
 };
 
-export const listFaxHistory = async (
-  residentId: number,
+export const listCommunications = async (
+  params?: ListCommunicationsParams,
   options?: RequestInit,
-): Promise<FaxLog[]> => {
-  return customFetch<FaxLog[]>(getListFaxHistoryUrl(residentId), {
+): Promise<CommunicationLog[]> => {
+  return customFetch<CommunicationLog[]>(getListCommunicationsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListFaxHistoryQueryKey = (residentId: number) => {
-  return [`/api/residents/${residentId}/fax-history`] as const;
+export const getListCommunicationsQueryKey = (
+  params?: ListCommunicationsParams,
+) => {
+  return [`/api/communications`, ...(params ? [params] : [])] as const;
 };
 
-export const getListFaxHistoryQueryOptions = <
-  TData = Awaited<ReturnType<typeof listFaxHistory>>,
+export const getListCommunicationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCommunications>>,
   TError = ErrorType<unknown>,
 >(
-  residentId: number,
+  params?: ListCommunicationsParams,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof listFaxHistory>>,
+      Awaited<ReturnType<typeof listCommunications>>,
       TError,
       TData
     >;
@@ -658,48 +673,43 @@ export const getListFaxHistoryQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListFaxHistoryQueryKey(residentId);
+    queryOptions?.queryKey ?? getListCommunicationsQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listFaxHistory>>> = ({
-    signal,
-  }) => listFaxHistory(residentId, { signal, ...requestOptions });
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCommunications>>
+  > = ({ signal }) => listCommunications(params, { signal, ...requestOptions });
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!residentId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listFaxHistory>>,
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCommunications>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type ListFaxHistoryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listFaxHistory>>
+export type ListCommunicationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCommunications>>
 >;
-export type ListFaxHistoryQueryError = ErrorType<unknown>;
+export type ListCommunicationsQueryError = ErrorType<unknown>;
 
 /**
- * @summary List fax history for a resident
+ * @summary List communications, optionally filtered by resident
  */
 
-export function useListFaxHistory<
-  TData = Awaited<ReturnType<typeof listFaxHistory>>,
+export function useListCommunications<
+  TData = Awaited<ReturnType<typeof listCommunications>>,
   TError = ErrorType<unknown>,
 >(
-  residentId: number,
+  params?: ListCommunicationsParams,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof listFaxHistory>>,
+      Awaited<ReturnType<typeof listCommunications>>,
       TError,
       TData
     >;
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListFaxHistoryQueryOptions(residentId, options);
+  const queryOptions = getListCommunicationsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

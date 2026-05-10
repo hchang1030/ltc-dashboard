@@ -24,7 +24,7 @@ A multi-module population health dashboard for Long-Term Care facilities. Care a
 
 ## Where things live
 
-- `lib/db/src/schema/` — source of truth for DB tables (8 tables total)
+- `lib/db/src/schema/` — source of truth for DB tables (10 tables total)
 - `lib/api-spec/openapi.yaml` — source of truth for API contracts
 - `lib/api-zod/src/generated/api.ts` — generated Zod schemas (don't edit)
 - `lib/api-client-react/src/generated/api.ts` — generated React Query hooks (don't edit)
@@ -39,6 +39,7 @@ A multi-module population health dashboard for Long-Term Care facilities. Care a
 - **Generated clinical notes**: Every module auto-generates a clinical note string from form state using `useMemo`. On save, the note is also copied to the clipboard for chart pasting.
 - **Physician alert enrichment**: The `/api/physician/summary` endpoint runs all per-resident queries in `Promise.all` for parallelism (6 DB queries per resident, all concurrent).
 - **Resident IDs**: Seeded residents start at ID 6 (not 1) — always use IDs from the `listResidents` API, never hardcode.
+- **Universal Comm Hub**: `contact_directory` stores Fax/Email/SMS contacts; `communication_logs` stores sent history. On send: DB log + clipboard copy of note + toast "Sent & Note Copied to Clipboard". The Comm Hub tab lives exclusively in the Physician View — no send triggers in DrillPanel.
 
 ## Product
 
@@ -56,8 +57,9 @@ A multi-module population health dashboard for Long-Term Care facilities. Care a
   - 🧠 2+ behavior events in last 24h
   - ⚠️ Any fall in last 24h
   - 📉 Abnormal vitals in last 24h
-- Click any resident → BM history side panel (timeline with Bristol chart)
+- Click any resident → BM history side panel (timeline with Bristol chart); no fax/comms in the drill panel
 - Facility monthly stats (48h gap count, blood event count)
+- **Comm Hub tab**: Universal composer (resident picker + Fax/Email/SMS method + filtered contact dropdown + note textarea + method-aware preview) + Contacts CRUD (click a contact to pre-fill composer) + global Communication History
 
 ## User preferences
 

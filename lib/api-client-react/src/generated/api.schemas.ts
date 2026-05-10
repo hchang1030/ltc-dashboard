@@ -283,31 +283,71 @@ export interface ResidentAlertSummary {
   hasAbnormalVital24h: boolean;
 }
 
-export interface FaxDirectoryEntry {
+export type ContactDirectoryEntryContactType =
+  (typeof ContactDirectoryEntryContactType)[keyof typeof ContactDirectoryEntryContactType];
+
+export const ContactDirectoryEntryContactType = {
+  Fax: "Fax",
+  Email: "Email",
+  SMS: "SMS",
+} as const;
+
+export interface ContactDirectoryEntry {
   id: number;
   labelName: string;
-  faxNumber: string;
+  contactValue: string;
+  contactType: ContactDirectoryEntryContactType;
 }
 
-export interface FaxDirectoryInput {
+export type ContactDirectoryInputContactType =
+  (typeof ContactDirectoryInputContactType)[keyof typeof ContactDirectoryInputContactType];
+
+export const ContactDirectoryInputContactType = {
+  Fax: "Fax",
+  Email: "Email",
+  SMS: "SMS",
+} as const;
+
+export interface ContactDirectoryInput {
   labelName: string;
-  faxNumber: string;
+  contactValue: string;
+  contactType: ContactDirectoryInputContactType;
 }
 
-export interface FaxInput {
+export type CommunicationInputMethod =
+  (typeof CommunicationInputMethod)[keyof typeof CommunicationInputMethod];
+
+export const CommunicationInputMethod = {
+  Fax: "Fax",
+  Email: "Email",
+  SMS: "SMS",
+} as const;
+
+export interface CommunicationInput {
   residentId: number;
   destinationLabel: string;
-  faxNumber: string;
+  contactValue: string;
+  method: CommunicationInputMethod;
   noteContent: string;
 }
 
-export interface FaxLog {
+export type CommunicationLogMethod =
+  (typeof CommunicationLogMethod)[keyof typeof CommunicationLogMethod];
+
+export const CommunicationLogMethod = {
+  Fax: "Fax",
+  Email: "Email",
+  SMS: "SMS",
+} as const;
+
+export interface CommunicationLog {
   id: number;
   residentId: number;
   residentName: string;
   residentRoom: string;
   destinationLabel: string;
-  faxNumber: string;
+  contactValue: string;
+  method: CommunicationLogMethod;
   noteContent: string;
   timestamp: string;
   status: string;
@@ -336,6 +376,10 @@ export interface PhysicianSummary {
   facilityMonthlyBlood: number;
   generatedAt: string;
 }
+
+export type ListCommunicationsParams = {
+  residentId?: number;
+};
 
 export type ListBowelMovementsParams = {
   residentId?: number;

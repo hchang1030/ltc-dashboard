@@ -7,5 +7,5 @@ export * from "./fallEvents";
 export * from "./vitalEvents";
 export * from "./billingLogs";
 export * from "./communicationBinder";
-export * from "./faxDirectory";
-export * from "./faxLogs";
+export * from "./contactDirectory";
+export * from "./communicationLogs";

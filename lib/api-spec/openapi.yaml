@@ -17,8 +17,8 @@ tags:
   - name: vitalEvents
   - name: physician
   - name: communicationBinder
-  - name: faxDirectory
-  - name: faxLogs
+  - name: contactDirectory
+  - name: communications
 
 paths:
   /healthz:
@@ -49,43 +49,43 @@ paths:
                 items:
                   $ref: "#/components/schemas/Resident"
 
-  /fax-directory:
+  /contact-directory:
     get:
-      operationId: listFaxDirectory
-      tags: [faxDirectory]
-      summary: List all fax directory entries
+      operationId: listContactDirectory
+      tags: [contactDirectory]
+      summary: List all contact directory entries
       responses:
         "200":
-          description: List of fax directory entries
+          description: List of contact directory entries
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/FaxDirectoryEntry"
+                  $ref: "#/components/schemas/ContactDirectoryEntry"
     post:
-      operationId: createFaxEntry
-      tags: [faxDirectory]
-      summary: Create a new fax directory entry
+      operationId: createContactEntry
+      tags: [contactDirectory]
+      summary: Create a new contact directory entry
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FaxDirectoryInput"
+              $ref: "#/components/schemas/ContactDirectoryInput"
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FaxDirectoryEntry"
+                $ref: "#/components/schemas/ContactDirectoryEntry"
 
-  /fax-directory/{entryId}:
+  /contact-directory/{entryId}:
     patch:
-      operationId: updateFaxEntry
-      tags: [faxDirectory]
-      summary: Update a fax directory entry
+      operationId: updateContactEntry
+      tags: [contactDirectory]
+      summary: Update a contact directory entry
       parameters:
         - name: entryId
           in: path
@@ -97,18 +97,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FaxDirectoryInput"
+              $ref: "#/components/schemas/ContactDirectoryInput"
       responses:
         "200":
           description: Updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FaxDirectoryEntry"
+                $ref: "#/components/schemas/ContactDirectoryEntry"
     delete:
-      operationId: deleteFaxEntry
-      tags: [faxDirectory]
-      summary: Delete a fax directory entry
+      operationId: deleteContactEntry
+      tags: [contactDirectory]
+      summary: Delete a contact directory entry
       parameters:
         - name: entryId
           in: path
@@ -119,45 +119,43 @@ paths:
         "204":
           description: Deleted
 
-  /fax:
+  /communications:
     post:
-      operationId: sendFax
-      tags: [faxLogs]
-      summary: Send a fax (mock)
+      operationId: sendCommunication
+      tags: [communications]
+      summary: Send a communication (mock)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FaxInput"
+              $ref: "#/components/schemas/CommunicationInput"
       responses:
         "201":
-          description: Fax log created
+          description: Communication log created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FaxLog"
-
-  /residents/{residentId}/fax-history:
+                $ref: "#/components/schemas/CommunicationLog"
     get:
-      operationId: listFaxHistory
-      tags: [faxLogs]
-      summary: List fax history for a resident
+      operationId: listCommunications
+      tags: [communications]
+      summary: List communications, optionally filtered by resident
       parameters:
         - name: residentId
-          in: path
-          required: true
+          in: query
+          required: false
           schema:
             type: integer
       responses:
         "200":
-          description: List of fax logs
+          description: List of communication logs
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/FaxLog"
+                  $ref: "#/components/schemas/CommunicationLog"
 
   /residents/{residentId}/favorite:
     patch:
@@ -765,42 +763,51 @@ components:
         hasAbnormalVital24h:
           type: boolean
 
-    FaxDirectoryEntry:
+    ContactDirectoryEntry:
       type: object
-      required: [id, labelName, faxNumber]
+      required: [id, labelName, contactValue, contactType]
       properties:
         id:
           type: integer
         labelName:
           type: string
-        faxNumber:
+        contactValue:
           type: string
+        contactType:
+          type: string
+          enum: [Fax, Email, SMS]
 
-    FaxDirectoryInput:
+    ContactDirectoryInput:
       type: object
-      required: [labelName, faxNumber]
+      required: [labelName, contactValue, contactType]
       properties:
         labelName:
           type: string
-        faxNumber:
+        contactValue:
           type: string
+        contactType:
+          type: string
+          enum: [Fax, Email, SMS]
 
-    FaxInput:
+    CommunicationInput:
       type: object
-      required: [residentId, destinationLabel, faxNumber, noteContent]
+      required: [residentId, destinationLabel, contactValue, method, noteContent]
       properties:
         residentId:
           type: integer
         destinationLabel:
           type: string
-        faxNumber:
+        contactValue:
           type: string
+        method:
+          type: string
+          enum: [Fax, Email, SMS]
         noteContent:
           type: string
 
-    FaxLog:
+    CommunicationLog:
       type: object
-      required: [id, residentId, residentName, residentRoom, destinationLabel, faxNumber, noteContent, timestamp, status]
+      required: [id, residentId, residentName, residentRoom, destinationLabel, contactValue, method, noteContent, timestamp, status]
       properties:
         id:
           type: integer
@@ -812,8 +819,11 @@ components:
           type: string
         destinationLabel:
           type: string
-        faxNumber:
+        contactValue:
           type: string
+        method:
+          type: string
+          enum: [Fax, Email, SMS]
         noteContent:
           type: string
         timestamp:

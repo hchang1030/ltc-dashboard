@@ -5,14 +5,16 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CommunicationLogMethod } from "./communicationLogMethod";
 
-export interface FaxLog {
+export interface CommunicationLog {
   id: number;
   residentId: number;
   residentName: string;
   residentRoom: string;
   destinationLabel: string;
-  faxNumber: string;
+  contactValue: string;
+  method: CommunicationLogMethod;
   noteContent: string;
   timestamp: Date;
   status: string;
