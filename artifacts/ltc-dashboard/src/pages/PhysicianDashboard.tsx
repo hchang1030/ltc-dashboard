@@ -75,6 +75,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PatientOverlay } from "@/components/PatientOverlay";
 import {
   processNLQ, getQIMetrics, getFamilyQuestions, saveFamilyQuestions,
+  getMockPRNLaxCount, getMockPRNAntipsychoticCount, getMockFalls,
 } from "@/data/mockData";
 import type { NLQResult, FamilyQuestion } from "@/data/mockData";
 
@@ -177,9 +178,31 @@ function DrillPanel({ resident, onClose, onOpenOverlay }: DrillPanelProps) {
   const [formSdmPhone, setFormSdmPhone] = useState("");
   const [allergyInput, setAllergyInput] = useState("");
   const [flagInput, setFlagInput] = useState("");
+  const [cpoeDraft, setCpoeDraft] = useState<string[]>([]);
+  const [cpoeCustom, setCpoeCustom] = useState("");
 
   const queryClient = useQueryClient();
   const { mutate: saveDemographics, isPending: isSaving } = useUpdateResidentDemographics();
+  const { toast: panelToast } = useToast();
+  const { data: cpoeTemplates = [] } = useListOrderTemplates(undefined, {
+    query: { queryKey: getListOrderTemplatesQueryKey() },
+  });
+  const signCpoe = useSignResidentOrder();
+
+  const handleCpoeSign = useCallback(() => {
+    if (!resident || cpoeDraft.length === 0) return;
+    signCpoe.mutate(
+      { data: { residentId: resident.residentId, orderText: cpoeDraft.join("\n") } },
+      {
+        onSuccess: async () => {
+          try { await navigator.clipboard.writeText(cpoeDraft.join("\n")); } catch { /* clipboard may be unavailable */ }
+          setCpoeDraft([]);
+          panelToast({ title: "Order Signed & Transmitted", description: `Order faxed for ${resident.name}. Note copied to clipboard.` });
+        },
+        onError: () => panelToast({ title: "Transmission Failed", description: "Could not sign the order.", variant: "destructive" }),
+      },
+    );
+  }, [resident, cpoeDraft, signCpoe, panelToast]);
 
   const openEdit = useCallback(() => {
     setFormCodeStatus(resident?.codeStatus ?? "");
@@ -569,15 +592,138 @@ function DrillPanel({ resident, onClose, onOpenOverlay }: DrillPanelProps) {
             )}
 
             {!hasAlerts && !resident?.sdmName && (
-              <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-                <div className="bg-muted/30 p-5 rounded-2xl">
-                  <UserCheck className="w-9 h-9 text-muted-foreground/40" />
+              <p className="text-xs text-muted-foreground/50 italic">No code status, allergies, or SDM on file. Click Edit to add.</p>
+            )}
+
+            {/* ── Care Continuity Tracker ────────────────────────── */}
+            {resident && (() => {
+              const falls = getMockFalls(resident.residentId);
+              const prnLax = getMockPRNLaxCount(resident.residentId);
+              const prnAP = getMockPRNAntipsychoticCount(resident.residentId);
+              const bmGap48h = resident.hoursSinceLastBM !== null && resident.hoursSinceLastBM >= 48;
+              const monthlyGaps = resident.monthlyGapCount;
+              return (
+                <section className="space-y-2.5">
+                  <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 flex items-center gap-1.5">
+                    <ClipboardList className="w-3 h-3" /> Care Continuity Tracker
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className={["rounded-xl border px-3 py-2.5 flex items-center gap-2.5", falls.length > 0 ? "bg-red-950/40 border-red-500/40" : "bg-background/50 border-border"].join(" ")}>
+                      <span className="text-base leading-none">⚠️</span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Falls (1yr)</p>
+                        <p className={["text-sm font-bold leading-tight", falls.length > 0 ? "text-red-400" : "text-emerald-400"].join(" ")}>
+                          {falls.length > 0 ? `${falls.length} event${falls.length !== 1 ? "s" : ""}` : "None recorded"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={["rounded-xl border px-3 py-2.5 flex items-center gap-2.5", bmGap48h ? "bg-amber-950/40 border-amber-500/40" : monthlyGaps > 0 ? "bg-amber-950/20 border-amber-500/20" : "bg-background/50 border-border"].join(" ")}>
+                      <span className="text-base leading-none">💩</span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">BM 48h+ Gaps</p>
+                        <p className={["text-sm font-bold leading-tight", bmGap48h ? "text-amber-400" : monthlyGaps > 0 ? "text-amber-300/70" : "text-emerald-400"].join(" ")}>
+                          {bmGap48h ? `Active · ${monthlyGaps} this mo.` : monthlyGaps > 0 ? `${monthlyGaps} this mo.` : "None this mo."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={["rounded-xl border px-3 py-2.5 flex items-center gap-2.5", prnLax > 2 ? "bg-orange-950/40 border-orange-500/40" : prnLax > 0 ? "bg-orange-950/20 border-orange-500/20" : "bg-background/50 border-border"].join(" ")}>
+                      <span className="text-base leading-none">💊</span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">PRN Lax (14d)</p>
+                        <p className={["text-sm font-bold leading-tight", prnLax > 2 ? "text-orange-400" : prnLax > 0 ? "text-orange-300/80" : "text-emerald-400"].join(" ")}>
+                          {prnLax > 0 ? `${prnLax} dose${prnLax !== 1 ? "s" : ""}` : "None"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={["rounded-xl border px-3 py-2.5 flex items-center gap-2.5", prnAP > 0 ? "bg-purple-950/40 border-purple-500/40" : "bg-background/50 border-border"].join(" ")}>
+                      <span className="text-base leading-none">🧠</span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">PRN Antipsych (14d)</p>
+                        <p className={["text-sm font-bold leading-tight", prnAP > 0 ? "text-purple-400" : "text-emerald-400"].join(" ")}>
+                          {prnAP > 0 ? `${prnAP} dose${prnAP !== 1 ? "s" : ""}` : "None"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              );
+            })()}
+
+            {/* ── CPOE Quick-Order ───────────────────────────────── */}
+            {resident && (
+              <section className="space-y-3 pb-2">
+                <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 flex items-center gap-1.5">
+                  <Stethoscope className="w-3 h-3" /> CPOE Quick-Order
+                </h3>
+
+                {/* Favorite templates */}
+                {cpoeTemplates.filter((t) => t.isFavorited).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {cpoeTemplates.filter((t) => t.isFavorited).slice(0, 6).map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          try {
+                            const lines = JSON.parse(t.contentJson) as string[];
+                            setCpoeDraft((prev) => [...prev, ...lines.filter(Boolean)]);
+                          } catch {
+                            setCpoeDraft((prev) => [...prev, t.title]);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-950/40 border border-violet-500/30 text-violet-300 text-xs font-semibold hover:bg-violet-900/40 transition-colors"
+                      >
+                        <Plus className="w-3 h-3 shrink-0" />{t.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Custom free-text */}
+                <div className="flex gap-2">
+                  <input
+                    value={cpoeCustom}
+                    onChange={(e) => setCpoeCustom(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && cpoeCustom.trim()) {
+                        setCpoeDraft((prev) => [...prev, cpoeCustom.trim()]);
+                        setCpoeCustom("");
+                      }
+                    }}
+                    placeholder="Type custom order, press Enter…"
+                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+                  />
+                  <button
+                    onClick={() => { if (cpoeCustom.trim()) { setCpoeDraft((prev) => [...prev, cpoeCustom.trim()]); setCpoeCustom(""); } }}
+                    className="px-3 py-2 rounded-lg bg-violet-900/40 border border-violet-500/30 text-violet-300 hover:bg-violet-800/40 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <div>
-                  <p className="text-muted-foreground font-semibold">No clinical flags on file</p>
-                  <p className="text-muted-foreground/60 text-sm mt-1">Click Edit to add code status, allergies,<br />infection flags, or SDM details.</p>
-                </div>
-              </div>
+
+                {/* Draft */}
+                {cpoeDraft.length > 0 && (
+                  <div className="rounded-xl border border-violet-500/20 bg-violet-950/20 divide-y divide-violet-500/10">
+                    {cpoeDraft.map((line, i) => (
+                      <div key={i} className="flex items-center gap-2 px-3 py-2">
+                        <span className="flex-1 text-xs text-foreground">{line}</span>
+                        <button onClick={() => setCpoeDraft((prev) => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-400 transition-colors shrink-0">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Sign button */}
+                <button
+                  onClick={handleCpoeSign}
+                  disabled={cpoeDraft.length === 0 || signCpoe.isPending}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all"
+                >
+                  {signCpoe.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Sign &amp; Transmit {cpoeDraft.length > 0 ? `(${cpoeDraft.length})` : ""}
+                </button>
+              </section>
             )}
           </div>
 
@@ -2009,9 +2155,27 @@ function OrderHub() {
   );
 }
 
+// ── MRP helpers ───────────────────────────────────────────────────────────────
+
+const MRP_LIST = ["Dr. S. Chang", "Dr. A. Patel", "Dr. R. Nguyen", "Dr. M. Kowalski", "Dr. L. Chen"];
+function getMRP(residentId: number) { return MRP_LIST[(residentId - 6) % MRP_LIST.length]; }
+
+// ── Physician Favorites helpers ───────────────────────────────────────────────
+
+const PHYS_FAV_KEY = "ltc_physician_favorites_v1";
+function loadPhysFavs(): Set<number> {
+  try {
+    const s = localStorage.getItem(PHYS_FAV_KEY);
+    return s ? new Set(JSON.parse(s) as number[]) : new Set();
+  } catch { return new Set(); }
+}
+function savePhysFavs(favs: Set<number>) {
+  localStorage.setItem(PHYS_FAV_KEY, JSON.stringify([...favs]));
+}
+
 // ── Sort helpers ──────────────────────────────────────────────────────────────
 
-type SortKey = "alertLevel" | "lastName" | "firstName" | "room" | "lastBM" | "gaps" | "blood" | "alerts";
+type SortKey = "alertLevel" | "lastName" | "firstName" | "room" | "lastBM" | "gaps" | "blood" | "alerts" | "mrp";
 
 function alertScore(r: ResidentAlertSummary) {
   return r.alertLevel === "red" ? 2 : r.alertLevel === "amber" ? 1 : 0;
@@ -2499,6 +2663,18 @@ export default function PhysicianDashboard() {
   const [overlayResident, setOverlayResident] = useState<ResidentAlertSummary | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [physFavs, setPhysFavs] = useState<Set<number>>(() => loadPhysFavs());
+  const [physFilter, setPhysFilter] = useState<"all" | "mine">("all");
+
+  const togglePhysFav = useCallback((residentId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPhysFavs((prev) => {
+      const next = new Set(prev);
+      if (next.has(residentId)) next.delete(residentId); else next.add(residentId);
+      savePhysFavs(next);
+      return next;
+    });
+  }, []);
 
   const handleSort = useCallback((key: SortKey) => {
     setSortKey((prev) => {
@@ -2532,7 +2708,7 @@ export default function PhysicianDashboard() {
   const sortedResidents = useMemo(() => {
     if (!data) return [];
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...data.residents].sort((a, b) => {
+    const sorted = [...data.residents].sort((a, b) => {
       switch (sortKey) {
         case "alertLevel": return dir * (alertScore(a) - alertScore(b));
         case "lastName":   return dir * parseName(a.name).lastName.localeCompare(parseName(b.name).lastName);
@@ -2546,10 +2722,13 @@ export default function PhysicianDashboard() {
         case "gaps":   return dir * (a.monthlyGapCount - b.monthlyGapCount);
         case "blood":  return dir * (a.monthlyBloodCount - b.monthlyBloodCount);
         case "alerts": return dir * (clinicalAlertCount(a) - clinicalAlertCount(b));
+        case "mrp":    return dir * getMRP(a.residentId).localeCompare(getMRP(b.residentId));
         default: return 0;
       }
     });
-  }, [data, sortKey, sortDir]);
+    if (physFilter === "mine") return sorted.filter((r) => physFavs.has(r.residentId));
+    return sorted;
+  }, [data, sortKey, sortDir, physFilter, physFavs]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -2557,7 +2736,7 @@ export default function PhysicianDashboard() {
       <header className="sticky top-0 z-30 bg-card border-b border-border px-6 py-3 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2">
           <span className="font-bold text-lg text-foreground">Physician View</span>
-          <span className="text-muted-foreground text-sm">— Population Health</span>
+          <span className="text-muted-foreground text-sm">— Residents</span>
         </div>
         <div className="flex items-center gap-4">
           {data && (
@@ -2594,7 +2773,7 @@ export default function PhysicianDashboard() {
             ].join(" ")}
           >
             <Activity className="w-4 h-4" />
-            Population Health
+            Residents
           </button>
           <button
             onClick={() => setView("binder")}
@@ -2695,8 +2874,23 @@ export default function PhysicianDashboard() {
         {/* Resident Summary Table */}
         {view === "population" && <section className="space-y-3">
           <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPhysFilter("all")}
+                className={["px-4 py-1.5 rounded-lg text-xs font-bold border-2 transition-all", physFilter === "all" ? "bg-primary/15 border-primary text-primary" : "bg-card border-border text-muted-foreground hover:border-primary/40"].join(" ")}
+              >
+                All Residents {data ? `(${data.residents.length})` : ""}
+              </button>
+              <button
+                onClick={() => setPhysFilter("mine")}
+                className={["flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold border-2 transition-all", physFilter === "mine" ? "bg-amber-700/20 border-amber-500 text-amber-300" : "bg-card border-border text-muted-foreground hover:border-amber-500/40"].join(" ")}
+              >
+                <Star className={["w-3 h-3", physFilter === "mine" ? "fill-amber-400 text-amber-400" : ""].join(" ")} />
+                My Patients {physFavs.size > 0 ? `(${physFavs.size})` : ""}
+              </button>
+            </div>
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Resident Status — Click any row to view full history
+              Click any row to view history · ☆ to save to My Patients
             </h2>
             {/* Badge legend */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground bg-card border border-border rounded-lg px-4 py-2.5">
@@ -2728,9 +2922,11 @@ export default function PhysicianDashboard() {
               <table className="w-full" data-testid="table-residents">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
+                    <th className="px-3 py-4 w-10" title="Save to My Patients"><Star className="w-3.5 h-3.5 text-muted-foreground/40 mx-auto" /></th>
                     <SortTh label="Alert"             sortK="alertLevel" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Last Name"         sortK="lastName"   currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="First Name"        sortK="firstName"  currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortTh label="MRP"               sortK="mrp"        currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Room"              sortK="room"       currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Last BM"           sortK="lastBM"     currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Elapsed"           sortK="lastBM"     currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
@@ -2772,6 +2968,15 @@ export default function PhysicianDashboard() {
                           "cursor-pointer hover:bg-primary/5 transition-colors group",
                         ].join(" ")}
                       >
+                        <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => togglePhysFav(resident.residentId, e)}
+                            title={physFavs.has(resident.residentId) ? "Remove from My Patients" : "Add to My Patients"}
+                            className="flex items-center justify-center w-7 h-7 rounded-lg hover:bg-amber-900/30 transition-colors"
+                          >
+                            <Star className={["w-4 h-4 transition-colors", physFavs.has(resident.residentId) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 group-hover:text-amber-400/50"].join(" ")} />
+                          </button>
+                        </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center justify-center">
                             <span className={["w-3 h-3 rounded-full", alertDot].join(" ")} data-testid={`alert-dot-${resident.residentId}`} />
@@ -2785,6 +2990,7 @@ export default function PhysicianDashboard() {
                         <td className="px-4 py-4">
                           <span className="text-muted-foreground">{firstName}</span>
                         </td>
+                        <td className="px-4 py-4 text-xs text-muted-foreground whitespace-nowrap">{getMRP(resident.residentId)}</td>
                         <td className="px-4 py-4 text-muted-foreground font-mono">{resident.room}</td>
                         <td className="px-4 py-4 text-sm text-muted-foreground font-mono whitespace-nowrap">
                           {formatLastBM(resident.lastBMAt)}
