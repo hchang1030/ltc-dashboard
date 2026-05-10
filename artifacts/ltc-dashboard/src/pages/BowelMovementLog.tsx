@@ -344,7 +344,7 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
               </div>
               <button onClick={() => onSelect(resident)}
                 className="shrink-0 flex items-center gap-1.5 bg-primary hover:bg-primary/80 active:scale-95 text-primary-foreground font-bold text-sm px-4 py-3 rounded-xl transition-all shadow-md shadow-primary/20">
-                Log Event <ChevronRight className="w-4 h-4" />
+                Chart <ChevronRight className="w-4 h-4" />
               </button>
             </li>
           ))}
