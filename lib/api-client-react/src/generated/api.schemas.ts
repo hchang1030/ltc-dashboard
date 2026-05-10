@@ -56,6 +56,8 @@ export interface BowelMovementInput {
   mucusPresent: boolean;
   painStraining: boolean;
   clinicalNote: string;
+  /** Override the timestamp of the bowel movement (defaults to now) */
+  recordedAt?: string;
 }
 
 export type ResidentAlertSummaryAlertLevel =

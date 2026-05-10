@@ -81,6 +81,10 @@ export const CreateBowelMovementBody = zod.object({
   mucusPresent: zod.boolean(),
   painStraining: zod.boolean(),
   clinicalNote: zod.string(),
+  recordedAt: zod.coerce
+    .date()
+    .optional()
+    .describe("Override the timestamp of the bowel movement (defaults to now)"),
 });
 
 /**

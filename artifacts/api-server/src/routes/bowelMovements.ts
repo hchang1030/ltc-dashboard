@@ -40,12 +40,17 @@ router.post("/bowel-movements", async (req, res): Promise<void> => {
     return;
   }
 
+  const { recordedAt, ...bmData } = parsed.data;
+
   const [row] = await db
     .insert(bowelMovementsTable)
-    .values(parsed.data)
+    .values({
+      ...bmData,
+      ...(recordedAt ? { createdAt: new Date(recordedAt) } : {}),
+    })
     .returning();
 
-  req.log.info({ id: row.id, residentId: row.residentId }, "Bowel movement recorded");
+  req.log.info({ id: row.id, residentId: row.residentId, recordedAt }, "Bowel movement recorded");
   res.status(201).json(ListBowelMovementsResponseItem.parse(row));
 });
 

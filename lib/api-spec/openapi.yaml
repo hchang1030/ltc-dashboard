@@ -223,6 +223,10 @@ components:
           type: boolean
         clinicalNote:
           type: string
+        recordedAt:
+          type: string
+          format: date-time
+          description: Override the timestamp of the bowel movement (defaults to now)
 
     ResidentAlertSummary:
       type: object

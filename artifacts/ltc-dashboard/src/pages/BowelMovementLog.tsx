@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Clock,
   Star,
@@ -43,6 +43,129 @@ const STOOL_TYPES = [
   { id: 6, desc: "Fluffy pieces",       color: "bg-[#d7ccc8]", text: "text-[#1a1a1a]" },
   { id: 7, desc: "Entirely liquid",     color: "bg-[#efebe9]", text: "text-[#1a1a1a]" },
 ] as const;
+
+// ── Date / Time picker helpers ────────────────────────────────────────────────
+
+function getTodayDateStr() {
+  const d = new Date();
+  return d.toISOString().split("T")[0];
+}
+
+function getCurrentHour() {
+  return new Date().getHours();
+}
+
+function getDateItems() {
+  const items: { label: string; value: string }[] = [];
+  const today = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const value = d.toISOString().split("T")[0];
+    let label: string;
+    if (i === 0) label = `Today · ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+    else if (i === 1) label = `Yesterday · ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+    else label = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    items.push({ label, value });
+  }
+  return items;
+}
+
+function getHourItems() {
+  const items: { label: string; value: number }[] = [];
+  for (let h = 0; h < 24; h++) {
+    const period = h < 12 ? "AM" : "PM";
+    const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    items.push({ label: `${display} ${period}`, value: h });
+  }
+  return items;
+}
+
+const DATE_ITEMS = getDateItems();
+const HOUR_ITEMS = getHourItems();
+const ITEM_H = 68;
+
+// ── ScrollPicker ──────────────────────────────────────────────────────────────
+
+function ScrollPicker<T extends string | number>({
+  items,
+  value,
+  onChange,
+}: {
+  items: { label: string; value: T }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const suppressRef = useRef(false);
+
+  const scrollToIndex = useCallback((idx: number, smooth = false) => {
+    const el = containerRef.current;
+    if (!el) return;
+    suppressRef.current = true;
+    el.scrollTo({ top: idx * ITEM_H, behavior: smooth ? "smooth" : "instant" });
+    setTimeout(() => { suppressRef.current = false; }, 150);
+  }, []);
+
+  useEffect(() => {
+    const idx = items.findIndex((i) => i.value === value);
+    if (idx >= 0) scrollToIndex(idx, false);
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (suppressRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const idx = Math.min(Math.round(el.scrollTop / ITEM_H), items.length - 1);
+    if (items[idx].value !== value) onChange(items[idx].value);
+  }, [items, value, onChange]);
+
+  return (
+    <div className="relative rounded-xl overflow-hidden bg-card border border-border" style={{ height: ITEM_H * 3 }}>
+      {/* Top fade */}
+      <div className="absolute inset-x-0 top-0 pointer-events-none z-10" style={{ height: ITEM_H, background: "linear-gradient(to bottom, var(--card) 30%, transparent)" }} />
+      {/* Bottom fade */}
+      <div className="absolute inset-x-0 bottom-0 pointer-events-none z-10" style={{ height: ITEM_H, background: "linear-gradient(to top, var(--card) 30%, transparent)" }} />
+      {/* Selection highlight */}
+      <div className="absolute inset-x-0 z-10 pointer-events-none border-y-2 border-primary/40 bg-primary/8" style={{ top: ITEM_H, height: ITEM_H }} />
+      {/* Scroll container */}
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="absolute inset-0 overflow-y-scroll"
+        style={{
+          scrollSnapType: "y mandatory",
+          scrollbarWidth: "none",
+          paddingTop: ITEM_H,
+          paddingBottom: ITEM_H,
+        }}
+      >
+        {items.map((item, i) => (
+          <div
+            key={i}
+            style={{ height: ITEM_H, scrollSnapAlign: "start" }}
+            className="flex items-center justify-center cursor-pointer select-none"
+            onClick={() => {
+              onChange(item.value);
+              scrollToIndex(i, true);
+            }}
+          >
+            <span
+              className={[
+                "font-bold transition-all duration-150",
+                item.value === value
+                  ? "text-foreground text-xl"
+                  : "text-muted-foreground/50 text-base",
+              ].join(" ")}
+            >
+              {item.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -336,6 +459,8 @@ function BMLogForm({ resident, onBack }: BMLogFormProps) {
     mucus: false,
     pain: false,
   });
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr);
+  const [selectedHour, setSelectedHour] = useState<number>(getCurrentHour);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -348,6 +473,13 @@ function BMLogForm({ resident, onBack }: BMLogFormProps) {
     setStoolType(null);
     setAmount(null);
     setFlags({ incontinence: false, blood: false, mucus: false, pain: false });
+    setSelectedDate(getTodayDateStr());
+    setSelectedHour(getCurrentHour());
+  };
+
+  const buildRecordedAt = () => {
+    const dt = new Date(`${selectedDate}T${String(selectedHour).padStart(2, "0")}:00:00`);
+    return dt.toISOString();
   };
 
   const handleSave = () => {
@@ -371,6 +503,7 @@ function BMLogForm({ resident, onBack }: BMLogFormProps) {
           mucusPresent: flags.mucus,
           painStraining: flags.pain,
           clinicalNote: note,
+          recordedAt: buildRecordedAt(),
         },
       },
       {
@@ -416,6 +549,31 @@ function BMLogForm({ resident, onBack }: BMLogFormProps) {
       </header>
 
       <main className="max-w-5xl mx-auto p-6 space-y-8">
+        {/* Date & Time */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Date &amp; Time of Bowel Movement
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-center text-muted-foreground uppercase tracking-wider">Date</p>
+              <ScrollPicker
+                items={DATE_ITEMS}
+                value={selectedDate}
+                onChange={(v) => setSelectedDate(v as string)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-center text-muted-foreground uppercase tracking-wider">Time</p>
+              <ScrollPicker
+                items={HOUR_ITEMS}
+                value={selectedHour}
+                onChange={(v) => setSelectedHour(v as number)}
+              />
+            </div>
+          </div>
+        </section>
+
         {/* Bristol Stool Scale */}
         <section className="space-y-3">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
