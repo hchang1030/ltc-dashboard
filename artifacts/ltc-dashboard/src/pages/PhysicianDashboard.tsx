@@ -1,19 +1,36 @@
-import { useGetPhysicianSummary, getGetPhysicianSummaryQueryKey } from "@workspace/api-client-react";
-import { Clock, RefreshCw, AlertTriangle, Droplets, CalendarX } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+  useGetPhysicianSummary,
+  getGetPhysicianSummaryQueryKey,
+  useListBowelMovements,
+} from "@workspace/api-client-react";
+import type { ResidentAlertSummary } from "@workspace/api-client-react";
+import {
+  Clock,
+  RefreshCw,
+  AlertTriangle,
+  Droplets,
+  CalendarX,
+  X,
+  ChevronRight,
+  Droplet,
+  Activity,
+} from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+
+// ── helpers ──────────────────────────────────────────────────────────────────
 
 function formatHours(hours: number | null): string {
   if (hours === null) return "No record";
   if (hours < 1) return "< 1 hour ago";
   if (hours < 24) return `${Math.round(hours)}h ago`;
   const days = Math.floor(hours / 24);
-  const remainingHours = Math.round(hours % 24);
-  return remainingHours > 0 ? `${days}d ${remainingHours}h ago` : `${days}d ago`;
+  const rem = Math.round(hours % 24);
+  return rem > 0 ? `${days}d ${rem}h ago` : `${days}d ago`;
 }
 
-function formatLastBM(lastBMAt: string | Date | null): string {
-  if (!lastBMAt) return "Never recorded";
-  return new Date(lastBMAt).toLocaleString("en-US", {
+function formatLastBM(val: string | Date | null): string {
+  if (!val) return "Never recorded";
+  return new Date(val).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -22,8 +39,253 @@ function formatLastBM(lastBMAt: string | Date | null): string {
   });
 }
 
+function formatFull(val: string | Date): string {
+  return new Date(val).toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+const BRISTOL_COLORS: Record<number, { dot: string; label: string; text: string }> = {
+  1: { dot: "bg-[#2d1b11]", label: "Separate hard lumps", text: "text-white" },
+  2: { dot: "bg-[#3e2723]", label: "Lumpy sausage",       text: "text-white" },
+  3: { dot: "bg-[#5d4037]", label: "Cracked surface",     text: "text-white" },
+  4: { dot: "bg-[#795548]", label: "Smooth & soft",       text: "text-white" },
+  5: { dot: "bg-[#bcaaa4]", label: "Soft blobs",          text: "text-[#1a1a1a]" },
+  6: { dot: "bg-[#d7ccc8]", label: "Fluffy pieces",       text: "text-[#1a1a1a]" },
+  7: { dot: "bg-[#efebe9]", label: "Entirely liquid",     text: "text-[#1a1a1a]" },
+};
+
+// ── Drill-down Panel ──────────────────────────────────────────────────────────
+
+interface DrillPanelProps {
+  resident: ResidentAlertSummary | null;
+  onClose: () => void;
+}
+
+function DrillPanel({ resident, onClose }: DrillPanelProps) {
+  const isOpen = resident !== null;
+
+  const { data: events = [], isLoading } = useListBowelMovements(
+    { residentId: resident?.residentId },
+    { query: { enabled: !!resident, queryKey: [`/api/bowel-movements`, { residentId: resident?.residentId }] } },
+  );
+
+  // sorted newest first
+  const sorted = [...events].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  // close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const isRed   = resident?.alertLevel === "red";
+  const isAmber = resident?.alertLevel === "amber";
+  const nameCls = isRed ? "text-red-400" : isAmber ? "text-amber-400" : "text-foreground";
+  const alertDot = isRed ? "bg-red-500" : isAmber ? "bg-amber-400" : "bg-emerald-500";
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        className={[
+          "fixed inset-0 z-40 bg-black/50 transition-opacity duration-300",
+          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+        ].join(" ")}
+        data-testid="drill-backdrop"
+      />
+
+      {/* Side panel */}
+      <aside
+        data-testid="drill-panel"
+        className={[
+          "fixed top-0 right-0 h-full w-[520px] max-w-full bg-card border-l border-border z-50",
+          "flex flex-col shadow-2xl transition-transform duration-300 ease-in-out",
+          isOpen ? "translate-x-0" : "translate-x-full",
+        ].join(" ")}
+      >
+        {/* Panel header */}
+        <div className="flex items-start justify-between px-6 py-5 border-b border-border bg-card shrink-0">
+          <div className="flex items-center gap-3">
+            <span className={["w-3 h-3 rounded-full mt-1 shrink-0", alertDot].join(" ")} />
+            <div>
+              <h2 className={["text-xl font-bold", nameCls].join(" ")}>
+                {resident?.name ?? "—"}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Room {resident?.room} &nbsp;·&nbsp; Bowel Movement History
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            data-testid="btn-drill-close"
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Alert strip */}
+        {resident && (
+          <div
+            className={[
+              "px-6 py-3 text-sm font-semibold flex items-center gap-2 shrink-0",
+              isRed
+                ? "bg-red-950/60 text-red-400 border-b border-red-900/40"
+                : isAmber
+                ? "bg-amber-950/50 text-amber-400 border-b border-amber-900/40"
+                : "bg-emerald-950/30 text-emerald-400 border-b border-emerald-900/30",
+            ].join(" ")}
+          >
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            {resident.lastBMAt
+              ? `Last BM: ${formatHours(resident.hoursSinceLastBM)} — ${formatLastBM(resident.lastBMAt)}`
+              : "No bowel movement on record"}
+          </div>
+        )}
+
+        {/* Monthly badges */}
+        {resident && (
+          <div className="flex gap-3 px-6 py-4 border-b border-border shrink-0">
+            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+              <CalendarX className="w-4 h-4 text-amber-400" />
+              <span className="text-amber-400 font-bold text-sm">{resident.monthlyGapCount}</span>
+              <span className="text-muted-foreground text-xs">48h gaps (mo.)</span>
+            </div>
+            <div className="flex items-center gap-2 bg-red-600/10 border border-red-600/25 rounded-lg px-3 py-2">
+              <Droplet className="w-4 h-4 text-red-400" />
+              <span className="text-red-400 font-bold text-sm">{resident.monthlyBloodCount}</span>
+              <span className="text-muted-foreground text-xs">blood events (mo.)</span>
+            </div>
+            <div className="flex items-center gap-2 bg-primary/10 border border-primary/25 rounded-lg px-3 py-2">
+              <Activity className="w-4 h-4 text-primary" />
+              <span className="text-primary font-bold text-sm">{events.length}</span>
+              <span className="text-muted-foreground text-xs">total recorded</span>
+            </div>
+          </div>
+        )}
+
+        {/* Timeline */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {isLoading && (
+            <p className="text-muted-foreground text-center py-12">Loading history...</p>
+          )}
+
+          {!isLoading && sorted.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+              <div className="bg-muted/40 p-5 rounded-full">
+                <Activity className="w-8 h-8 text-muted-foreground/50" />
+              </div>
+              <p className="text-muted-foreground font-medium">No bowel movements recorded yet</p>
+              <p className="text-muted-foreground/60 text-sm">
+                Use the Care Aide view to log the first entry.
+              </p>
+            </div>
+          )}
+
+          {sorted.map((bm, idx) => {
+            const bristol = BRISTOL_COLORS[bm.bristolType] ?? BRISTOL_COLORS[4];
+            const hasFlags = bm.incontinence || bm.bloodPresent || bm.mucusPresent || bm.painStraining;
+            const isFirst = idx === 0;
+
+            return (
+              <div
+                key={bm.id}
+                data-testid={`drill-event-${bm.id}`}
+                className={[
+                  "rounded-xl border p-4 space-y-3",
+                  isFirst ? "border-primary/40 bg-primary/5" : "border-border bg-background/60",
+                ].join(" ")}
+              >
+                {/* Top row: timestamp + type badge */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {formatFull(bm.createdAt)}
+                    {isFirst && (
+                      <span className="ml-2 text-primary font-bold uppercase tracking-wider text-[10px] bg-primary/15 px-2 py-0.5 rounded-full">
+                        Most recent
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                {/* Bristol + Amount row */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className={[
+                      "w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0",
+                      bristol.dot,
+                      bristol.text,
+                    ].join(" ")}
+                  >
+                    {bm.bristolType}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground text-sm">
+                      Type {bm.bristolType} &nbsp;·&nbsp; {bristol.label}
+                    </p>
+                    <p className="text-muted-foreground text-sm">Amount: <span className="font-medium text-foreground">{bm.amount}</span></p>
+                  </div>
+                </div>
+
+                {/* Clinical flags */}
+                {hasFlags && (
+                  <div className="flex flex-wrap gap-2">
+                    {bm.incontinence && (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        Incontinence
+                      </span>
+                    )}
+                    {bm.bloodPresent && (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-600/20 text-red-400 border border-red-600/30">
+                        Blood Present
+                      </span>
+                    )}
+                    {bm.mucusPresent && (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                        Mucus Present
+                      </span>
+                    )}
+                    {bm.painStraining && (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                        Pain / Straining
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Clinical note */}
+                {bm.clinicalNote && (
+                  <p className="text-xs font-mono text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 leading-relaxed border border-border/50">
+                    {bm.clinicalNote}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// ── Main Dashboard ────────────────────────────────────────────────────────────
+
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
+  const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
+
   const { data, isLoading, isError, refetch, isFetching } = useGetPhysicianSummary({
     query: { refetchInterval: 60_000, queryKey: getGetPhysicianSummaryQueryKey() },
   });
@@ -33,11 +295,13 @@ export default function PhysicianDashboard() {
     return () => clearInterval(timer);
   }, []);
 
+  const handleClose = useCallback(() => setSelectedResident(null), []);
+
   const alertCounts = data
     ? {
-        red: data.residents.filter((r) => r.alertLevel === "red").length,
+        red:   data.residents.filter((r) => r.alertLevel === "red").length,
         amber: data.residents.filter((r) => r.alertLevel === "amber").length,
-        none: data.residents.filter((r) => r.alertLevel === "none").length,
+        none:  data.residents.filter((r) => r.alertLevel === "none").length,
       }
     : null;
 
@@ -46,14 +310,11 @@ export default function PhysicianDashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-card border-b border-border px-6 py-3 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-lg text-foreground">Physician View</span>
-            <span className="text-muted-foreground text-sm">— Population Health</span>
-          </div>
+      <header className="sticky top-0 z-30 bg-card border-b border-border px-6 py-3 flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-lg text-foreground">Physician View</span>
+          <span className="text-muted-foreground text-sm">— Population Health</span>
         </div>
-
         <div className="flex items-center gap-4">
           {data && (
             <span className="text-xs text-muted-foreground font-mono">
@@ -113,7 +374,7 @@ export default function PhysicianDashboard() {
         {/* Resident Summary Table */}
         <section className="space-y-3">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Resident Status — All Residents
+            Resident Status — Click any row to view full history
           </h2>
 
           {isLoading && (
@@ -133,43 +394,36 @@ export default function PhysicianDashboard() {
               <table className="w-full" data-testid="table-residents">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className="text-left px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold">
-                      Alert
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold">
-                      Resident
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold">
-                      Room
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold">
-                      Last BM
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold">
-                      Elapsed
-                    </th>
-                    <th className="text-center px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold">
-                      48h Gaps (Mo.)
-                    </th>
-                    <th className="text-center px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold">
-                      Blood Events (Mo.)
-                    </th>
+                    {["Alert", "Resident", "Room", "Last BM", "Elapsed", "48h Gaps (Mo.)", "Blood Events (Mo.)", ""].map((h) => (
+                      <th
+                        key={h}
+                        className="text-left px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold last:w-8"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {data.residents.map((resident, idx) => {
-                    const isRed = resident.alertLevel === "red";
+                    const isRed   = resident.alertLevel === "red";
                     const isAmber = resident.alertLevel === "amber";
-                    const rowBg = isRed
+                    const isSelected = selectedResident?.residentId === resident.residentId;
+
+                    const rowBg = isSelected
+                      ? "bg-primary/10 border-l-4 border-l-primary"
+                      : isRed
                       ? "bg-red-950/40"
                       : isAmber
                       ? "bg-amber-950/30"
                       : "";
+
                     const nameCls = isRed
                       ? "text-red-400 font-bold"
                       : isAmber
                       ? "text-amber-400 font-bold"
                       : "text-foreground font-semibold";
+
                     const alertDot = isRed
                       ? "bg-red-500"
                       : isAmber
@@ -180,18 +434,16 @@ export default function PhysicianDashboard() {
                       <tr
                         key={resident.residentId}
                         data-testid={`row-resident-${resident.residentId}`}
+                        onClick={() => setSelectedResident(isSelected ? null : resident)}
                         className={[
                           rowBg,
                           idx < data.residents.length - 1 ? "border-b border-border/50" : "",
-                          "transition-colors",
+                          "cursor-pointer hover:bg-primary/5 transition-colors group",
                         ].join(" ")}
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center">
-                            <span
-                              className={["w-3 h-3 rounded-full", alertDot].join(" ")}
-                              data-testid={`alert-dot-${resident.residentId}`}
-                            />
+                            <span className={["w-3 h-3 rounded-full", alertDot].join(" ")} data-testid={`alert-dot-${resident.residentId}`} />
                           </div>
                         </td>
                         <td className="px-6 py-5">
@@ -199,41 +451,27 @@ export default function PhysicianDashboard() {
                             {resident.name}
                           </span>
                         </td>
-                        <td className="px-6 py-5 text-muted-foreground font-mono">
-                          {resident.room}
-                        </td>
+                        <td className="px-6 py-5 text-muted-foreground font-mono">{resident.room}</td>
                         <td className="px-6 py-5 text-sm text-muted-foreground font-mono">
                           {formatLastBM(resident.lastBMAt)}
                         </td>
                         <td className="px-6 py-5">
-                          <span
-                            className={[
-                              "text-sm font-semibold font-mono",
-                              isRed ? "text-red-400" : isAmber ? "text-amber-400" : "text-muted-foreground",
-                            ].join(" ")}
-                          >
+                          <span className={["text-sm font-semibold font-mono", isRed ? "text-red-400" : isAmber ? "text-amber-400" : "text-muted-foreground"].join(" ")}>
                             {formatHours(resident.hoursSinceLastBM)}
                           </span>
                         </td>
                         <td className="px-6 py-5 text-center">
-                          <span
-                            className={[
-                              "text-lg font-bold",
-                              resident.monthlyGapCount > 0 ? "text-amber-400" : "text-muted-foreground",
-                            ].join(" ")}
-                          >
+                          <span className={["text-lg font-bold", resident.monthlyGapCount > 0 ? "text-amber-400" : "text-muted-foreground"].join(" ")}>
                             {resident.monthlyGapCount}
                           </span>
                         </td>
                         <td className="px-6 py-5 text-center">
-                          <span
-                            className={[
-                              "text-lg font-bold",
-                              resident.monthlyBloodCount > 0 ? "text-red-400" : "text-muted-foreground",
-                            ].join(" ")}
-                          >
+                          <span className={["text-lg font-bold", resident.monthlyBloodCount > 0 ? "text-red-400" : "text-muted-foreground"].join(" ")}>
                             {resident.monthlyBloodCount}
                           </span>
+                        </td>
+                        <td className="px-4 py-5">
+                          <ChevronRight className={["w-4 h-4 text-muted-foreground/40 transition-transform group-hover:text-primary", isSelected ? "rotate-180 text-primary" : ""].join(" ")} />
                         </td>
                       </tr>
                     );
@@ -251,44 +489,33 @@ export default function PhysicianDashboard() {
               Facility Statistics — {monthName} {time.getFullYear()}
             </h2>
             <div className="grid grid-cols-2 gap-4">
-              <div
-                className="bg-card border-2 border-amber-500/30 rounded-xl p-6 flex items-center gap-5"
-                data-testid="stat-monthly-gaps"
-              >
+              <div className="bg-card border-2 border-amber-500/30 rounded-xl p-6 flex items-center gap-5" data-testid="stat-monthly-gaps">
                 <div className="bg-amber-500/15 p-4 rounded-full">
                   <CalendarX className="w-7 h-7 text-amber-400" />
                 </div>
                 <div>
                   <p className="text-4xl font-bold text-amber-400">{data.facilityMonthlyGaps}</p>
-                  <p className="text-sm text-muted-foreground font-medium mt-1">
-                    48-hour gaps this month
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 mt-0.5">
-                    Intervals between BMs exceeding 48 hours
-                  </p>
+                  <p className="text-sm text-muted-foreground font-medium mt-1">48-hour gaps this month</p>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">Intervals between BMs exceeding 48 hours</p>
                 </div>
               </div>
-              <div
-                className="bg-card border-2 border-red-600/30 rounded-xl p-6 flex items-center gap-5"
-                data-testid="stat-monthly-blood"
-              >
+              <div className="bg-card border-2 border-red-600/30 rounded-xl p-6 flex items-center gap-5" data-testid="stat-monthly-blood">
                 <div className="bg-red-600/15 p-4 rounded-full">
                   <Droplets className="w-7 h-7 text-red-500" />
                 </div>
                 <div>
                   <p className="text-4xl font-bold text-red-500">{data.facilityMonthlyBlood}</p>
-                  <p className="text-sm text-muted-foreground font-medium mt-1">
-                    Blood present events this month
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 mt-0.5">
-                    Facility-wide across all residents
-                  </p>
+                  <p className="text-sm text-muted-foreground font-medium mt-1">Blood present events this month</p>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">Facility-wide across all residents</p>
                 </div>
               </div>
             </div>
           </section>
         )}
       </main>
+
+      {/* Drill-down panel */}
+      <DrillPanel resident={selectedResident} onClose={handleClose} />
     </div>
   );
 }
