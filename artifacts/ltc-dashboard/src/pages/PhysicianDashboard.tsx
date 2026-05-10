@@ -57,6 +57,7 @@ import {
   Phone,
   Save,
   UserCheck,
+  Mic,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -148,6 +149,9 @@ function TagInput({ tags, onAdd, onRemove, placeholder, inputValue, setInputValu
 function DrillPanel({ resident, onClose }: DrillPanelProps) {
   const isOpen = resident !== null;
   const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "notes">("overview");
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState("");
 
   const [formCodeStatus, setFormCodeStatus] = useState("");
   const [formAllergies, setFormAllergies] = useState<string[]>([]);
@@ -196,40 +200,97 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
     );
   }, [resident, formCodeStatus, formAllergies, formInfectionFlags, formSdmName, formSdmRelation, formSdmPhone, saveDemographics, queryClient]);
 
-  const { data: events = [], isLoading } = useListBowelMovements(
-    { residentId: resident?.residentId },
-    { query: { enabled: !!resident, queryKey: [`/api/bowel-movements`, { residentId: resident?.residentId }] } },
-  );
-
-  const sorted = [...events].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  const mockNotes = useMemo(() => {
+    if (!resident) return [];
+    const firstName = resident.name.split(" ")[0];
+    const now = Date.now();
+    const pool: Array<{ id: string; dateTime: string; author: string; role: string; roleType: "md" | "rn" | "allied"; text: string }> = [
+      {
+        id: "a",
+        dateTime: new Date(now - 1.5 * 3600000).toISOString(),
+        author: "Dr. Sarah Chang",
+        role: "Attending Physician",
+        roleType: "md",
+        text: `${firstName} seen on rounds. Alert and oriented ×3. Vitals stable. Appetite reported fair. Continue current medication regimen. Family meeting scheduled Thursday to discuss goals of care.`,
+      },
+      {
+        id: "b",
+        dateTime: new Date(now - 4 * 3600000).toISOString(),
+        author: "Jane Kowalski RN",
+        role: "Registered Nurse",
+        roleType: "rn",
+        text: `Resident reported mild lower back discomfort rated 3/10. Repositioned and applied heat pack per PRN order. Pain reassessed at 1/10 post-intervention. Resident resting comfortably.`,
+      },
+      {
+        id: "c",
+        dateTime: new Date(now - 22 * 3600000).toISOString(),
+        author: "Dr. Raj Patel",
+        role: "Consulting Geriatrician",
+        roleType: "md",
+        text: `Geriatric consult completed. Reviewed recent labs — Hgb 10.2, mildly low. Recommend dietary iron supplementation and recheck in 6 weeks. No acute concerns at this time.`,
+      },
+      {
+        id: "d",
+        dateTime: new Date(now - 26 * 3600000).toISOString(),
+        author: "Maria Santos RN",
+        role: "Charge Nurse",
+        roleType: "rn",
+        text: `Skin assessment completed during morning care. Small stage I pressure injury noted at coccyx. Wound protocol initiated. Repositioning schedule updated to q2h. Family notified.`,
+      },
+      {
+        id: "e",
+        dateTime: new Date(now - 48 * 3600000).toISOString(),
+        author: "Dr. Sarah Chang",
+        role: "Attending Physician",
+        roleType: "md",
+        text: `Family meeting conducted re: ${firstName}'s prognosis and POLST form. SDM and two siblings present. DNR/DNH status confirmed. All questions addressed. Documentation updated in chart.`,
+      },
+      {
+        id: "f",
+        dateTime: new Date(now - 72 * 3600000).toISOString(),
+        author: "Tom Bradley OT",
+        role: "Occupational Therapist",
+        roleType: "allied",
+        text: `Functional mobility assessment completed. ${firstName} requires moderate assist for bed-to-chair transfers. New transfer belt ordered. Staff education on safe technique completed.`,
+      },
+    ];
+    const offset = resident.residentId % pool.length;
+    return [...pool.slice(offset), ...pool.slice(0, offset)];
+  }, [resident]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isEditing) setIsEditing(false);
-        else onClose();
+        if (showNoteModal) { setShowNoteModal(false); return; }
+        if (isEditing) { setIsEditing(false); return; }
+        onClose();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose, isEditing]);
+  }, [onClose, isEditing, showNoteModal]);
 
   useEffect(() => {
-    if (!isOpen) setIsEditing(false);
+    if (!isOpen) { setIsEditing(false); setActiveTab("overview"); setShowNoteModal(false); }
   }, [isOpen]);
 
   const isRed   = resident?.alertLevel === "red";
   const isAmber = resident?.alertLevel === "amber";
   const nameCls = isRed ? "text-red-400" : isAmber ? "text-amber-400" : "text-foreground";
-  const alertDot = isRed ? "bg-red-500" : isAmber ? "bg-amber-400" : "bg-emerald-500";
-
-  const initials = resident?.name
-    ? resident.name.split(" ").map((p) => p[0]).slice(0, 2).join("")
-    : "?";
-
   const hasAlerts = !!(resident?.codeStatus || resident?.allergies?.length || resident?.infectionFlags?.length);
+  const photoUrl = resident
+    ? `https://i.pravatar.cc/120?img=${((resident.residentId - 6) % 70) + 1}`
+    : "";
+
+  const formatRelative = (iso: string) => {
+    const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
+    if (h < 1) return "Just now";
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
+  const formatNoteTime = (iso: string) =>
+    new Date(iso).toLocaleString("en-CA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
   return (
     <>
@@ -255,22 +316,23 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
         {/* Panel header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-4">
-            {/* Photo placeholder */}
-            <div className={[
-              "w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold shrink-0 border-2",
-              isRed ? "bg-red-900/40 text-red-300 border-red-700/50"
-                : isAmber ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
-                : "bg-muted text-muted-foreground border-border",
-            ].join(" ")}>
-              {initials}
+            {/* Square resident photo */}
+            <div className="w-[72px] h-[72px] rounded-xl overflow-hidden shrink-0 border border-border bg-muted">
+              {resident && (
+                <img
+                  src={photoUrl}
+                  alt={resident.name}
+                  className="w-full h-full object-cover"
+                />
+              )}
             </div>
             <div>
-              <h2 className={["text-xl font-bold", nameCls].join(" ")}>
+              <h2 className={["text-xl font-bold leading-tight", nameCls].join(" ")}>
                 {resident?.name ?? "—"}
               </h2>
-              <p className="text-xs text-muted-foreground">Room {resident?.room}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Room {resident?.room}</p>
               {resident && (
-                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
                   {resident.phn && (
                     <span className="text-xs text-muted-foreground">
                       <span className="font-semibold text-muted-foreground/60 uppercase tracking-wider text-[10px]">PHN </span>
@@ -296,11 +358,10 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 mt-1">
             {!isEditing && (
               <button
                 onClick={openEdit}
-                title="Edit demographics"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors text-xs font-medium"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -317,81 +378,32 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
           </div>
         </div>
 
-        {/* High-alert tags */}
-        {resident && hasAlerts && !isEditing && (
-          <div className="px-6 py-3 border-b border-border shrink-0 flex flex-wrap gap-2">
-            {resident.codeStatus && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-900/40 text-purple-300 border border-purple-500/40 uppercase tracking-wide">
-                <Shield className="w-3 h-3 shrink-0" />
-                {resident.codeStatus}
-              </span>
-            )}
-            {resident.allergies?.map((a) => (
-              <span key={a} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-900/40 text-red-300 border border-red-500/40 uppercase tracking-wide">
-                <AlertCircle className="w-3 h-3 shrink-0" />
-                ALLERGY: {a}
-              </span>
-            ))}
-            {resident.infectionFlags?.map((f) => (
-              <span key={f} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-900/40 text-amber-300 border border-amber-500/40 uppercase tracking-wide">
-                <AlertTriangle className="w-3 h-3 shrink-0" />
-                ISOLATION: {f}
-              </span>
+        {/* Tab bar */}
+        {!isEditing && (
+          <div className="flex shrink-0 border-b border-border">
+            {(["overview", "notes"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={[
+                  "flex-1 py-3.5 text-sm font-semibold transition-colors border-b-2",
+                  activeTab === tab
+                    ? "text-primary border-primary bg-primary/5"
+                    : "text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/40",
+                ].join(" ")}
+              >
+                {tab === "overview" ? "Overview" : "Notes"}
+              </button>
             ))}
           </div>
         )}
 
-        {/* SDM section */}
-        {resident?.sdmName && !isEditing && (
-          <div className="px-6 py-3 border-b border-border shrink-0 bg-muted/20">
-            <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 mb-2 flex items-center gap-1.5">
-              <UserCheck className="w-3 h-3" />
-              Substitute Decision Maker
-            </p>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-foreground">{resident.sdmName}</p>
-                {resident.sdmRelation && <p className="text-xs text-muted-foreground">{resident.sdmRelation}</p>}
-              </div>
-              {resident.sdmPhone && (
-                <a
-                  href={`tel:${resident.sdmPhone}`}
-                  className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-mono font-medium shrink-0"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  {resident.sdmPhone}
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Alert strip */}
-        {resident && !isEditing && (
-          <div
-            className={[
-              "px-6 py-2.5 text-sm font-semibold flex items-center gap-2 shrink-0",
-              isRed
-                ? "bg-red-950/60 text-red-400 border-b border-red-900/40"
-                : isAmber
-                ? "bg-amber-950/50 text-amber-400 border-b border-amber-900/40"
-                : "bg-emerald-950/30 text-emerald-400 border-b border-emerald-900/30",
-            ].join(" ")}
-          >
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            {resident.lastBMAt
-              ? `Last BM: ${formatHours(resident.hoursSinceLastBM)} — ${formatLastBM(resident.lastBMAt)}`
-              : "No bowel movement on record"}
-          </div>
-        )}
-
-        {/* Edit form */}
+        {/* ── Edit form ─────────────────────────────────────── */}
         {isEditing ? (
           <div className="flex-1 overflow-y-auto">
             <div className="px-6 py-5 space-y-6">
               <p className="text-xs uppercase tracking-widest font-bold text-muted-foreground/60">Editing Demographics — {resident?.name}</p>
 
-              {/* Code Status */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <Shield className="w-3.5 h-3.5 text-purple-400" /> Code Status
@@ -401,11 +413,10 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
                   value={formCodeStatus}
                   onChange={(e) => setFormCodeStatus(e.target.value)}
                   placeholder="e.g. DNR M1-M4 C1, C2 · Full Code · CPR"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
 
-              {/* Allergies */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 text-red-400" /> Allergies
@@ -420,7 +431,6 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
                 />
               </div>
 
-              {/* Infection Control */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Infection Control Flags
@@ -435,7 +445,6 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
                 />
               </div>
 
-              {/* SDM */}
               <div className="space-y-3">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <UserCheck className="w-3.5 h-3.5 text-primary" /> Substitute Decision Maker
@@ -445,125 +454,216 @@ function DrillPanel({ resident, onClose }: DrillPanelProps) {
                   value={formSdmName}
                   onChange={(e) => setFormSdmName(e.target.value)}
                   placeholder="Full name"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <input
                   type="text"
                   value={formSdmRelation}
                   onChange={(e) => setFormSdmRelation(e.target.value)}
                   placeholder="Relationship (e.g. Daughter, Son, Spouse)"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <input
                   type="tel"
                   value={formSdmPhone}
                   onChange={(e) => setFormSdmPhone(e.target.value)}
                   placeholder="Phone number"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             </div>
 
-            {/* Save / Cancel bar */}
             <div className="sticky bottom-0 border-t border-border bg-card px-6 py-4 flex gap-3">
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? "Saving…" : "Save Changes"}
               </button>
               <button
                 onClick={() => setIsEditing(false)}
-                className="px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors text-sm font-medium"
+                className="px-5 py-3 rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors text-sm font-medium"
               >
                 Cancel
               </button>
             </div>
           </div>
-        ) : (
-          <>
-            {/* Monthly badges */}
-            {resident && (
-              <div className="flex gap-2 px-6 py-3 border-b border-border shrink-0 flex-wrap">
-                <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-1.5">
-                  <CalendarX className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-amber-400 font-bold text-sm">{resident.monthlyGapCount}</span>
-                  <span className="text-muted-foreground text-xs">48h gaps</span>
+
+        ) : activeTab === "overview" ? (
+          /* ── Overview Tab ─────────────────────────────────── */
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+            {hasAlerts && (
+              <section className="space-y-3">
+                <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60">Clinical Flags</h3>
+                <div className="flex flex-wrap gap-2">
+                  {resident?.codeStatus && (
+                    <span className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-900/40 text-purple-300 border border-purple-500/40 uppercase tracking-wide">
+                      <Shield className="w-3.5 h-3.5 shrink-0" />
+                      {resident.codeStatus}
+                    </span>
+                  )}
+                  {resident?.allergies?.map((a) => (
+                    <span key={a} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-red-900/40 text-red-300 border border-red-500/40 uppercase tracking-wide">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      ALLERGY: {a}
+                    </span>
+                  ))}
+                  {resident?.infectionFlags?.map((f) => (
+                    <span key={f} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-900/40 text-amber-300 border border-amber-500/40 uppercase tracking-wide">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      ISOLATION: {f}
+                    </span>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2 bg-red-600/10 border border-red-600/25 rounded-lg px-3 py-1.5">
-                  <Droplet className="w-3.5 h-3.5 text-red-400" />
-                  <span className="text-red-400 font-bold text-sm">{resident.monthlyBloodCount}</span>
-                  <span className="text-muted-foreground text-xs">blood events</span>
+              </section>
+            )}
+
+            {resident?.sdmName && (
+              <section className="space-y-3">
+                <h3 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 flex items-center gap-1.5">
+                  <UserCheck className="w-3 h-3" /> Substitute Decision Maker
+                </h3>
+                <div className="rounded-xl border border-border bg-background/50 p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-foreground">{resident.sdmName}</p>
+                    {resident.sdmRelation && <p className="text-xs text-muted-foreground mt-0.5">{resident.sdmRelation}</p>}
+                  </div>
+                  {resident.sdmPhone && (
+                    <a
+                      href={`tel:${resident.sdmPhone}`}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-mono text-sm font-semibold shrink-0"
+                    >
+                      <Phone className="w-4 h-4" />
+                      {resident.sdmPhone}
+                    </a>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 bg-primary/10 border border-primary/25 rounded-lg px-3 py-1.5">
-                  <Activity className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-primary font-bold text-sm">{events.length}</span>
-                  <span className="text-muted-foreground text-xs">BMs recorded</span>
+              </section>
+            )}
+
+            {!hasAlerts && !resident?.sdmName && (
+              <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+                <div className="bg-muted/30 p-5 rounded-2xl">
+                  <UserCheck className="w-9 h-9 text-muted-foreground/40" />
+                </div>
+                <div>
+                  <p className="text-muted-foreground font-semibold">No clinical flags on file</p>
+                  <p className="text-muted-foreground/60 text-sm mt-1">Click Edit to add code status, allergies,<br />infection flags, or SDM details.</p>
                 </div>
               </div>
             )}
+          </div>
 
-            {/* BM History */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-              {isLoading && (
-                <p className="text-muted-foreground text-center py-12">Loading history...</p>
-              )}
-              {!isLoading && sorted.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                  <div className="bg-muted/40 p-5 rounded-full">
-                    <Activity className="w-8 h-8 text-muted-foreground/50" />
+        ) : (
+          /* ── Notes Tab ────────────────────────────────────── */
+          <>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {mockNotes.map((note) => (
+                <div
+                  key={note.id}
+                  className={[
+                    "rounded-xl p-4 space-y-2.5 bg-background/60 border border-border/40 border-l-[3px]",
+                    note.roleType === "md" ? "border-l-blue-500"
+                      : note.roleType === "rn" ? "border-l-emerald-500"
+                      : "border-l-violet-400",
+                  ].join(" ")}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground leading-tight">{note.author}</p>
+                      <p className={[
+                        "text-xs font-medium mt-0.5",
+                        note.roleType === "md" ? "text-blue-400"
+                          : note.roleType === "rn" ? "text-emerald-400"
+                          : "text-violet-400",
+                      ].join(" ")}>
+                        {note.role}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-mono text-muted-foreground">{formatNoteTime(note.dateTime)}</p>
+                      <p className="text-[10px] text-muted-foreground/50 mt-0.5">{formatRelative(note.dateTime)}</p>
+                    </div>
                   </div>
-                  <p className="text-muted-foreground font-medium">No bowel movements recorded yet</p>
-                  <p className="text-muted-foreground/60 text-sm">Use the Frontline Staff view to log the first entry.</p>
+                  <p className="text-sm text-foreground/80 leading-relaxed">{note.text}</p>
                 </div>
-              )}
-              {sorted.map((bm, idx) => {
-                const bristol = BRISTOL_COLORS[bm.bristolType] ?? BRISTOL_COLORS[4];
-                const hasFlags = bm.incontinence || bm.bloodPresent || bm.mucusPresent || bm.painStraining;
-                const isFirst = idx === 0;
-                return (
-                  <div
-                    key={bm.id}
-                    data-testid={`drill-event-${bm.id}`}
-                    className={["rounded-xl border p-4 space-y-3", isFirst ? "border-primary/40 bg-primary/5" : "border-border bg-background/60"].join(" ")}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono text-muted-foreground">
-                        {formatFull(bm.createdAt)}
-                        {isFirst && (
-                          <span className="ml-2 text-primary font-bold uppercase tracking-wider text-[10px] bg-primary/15 px-2 py-0.5 rounded-full">Most recent</span>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className={["w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0", bristol.dot, bristol.text].join(" ")}>
-                        {bm.bristolType}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground text-sm">Type {bm.bristolType} &nbsp;·&nbsp; {bristol.label}</p>
-                        <p className="text-muted-foreground text-sm">Amount: <span className="font-medium text-foreground">{bm.amount}</span></p>
-                      </div>
-                    </div>
-                    {hasFlags && (
-                      <div className="flex flex-wrap gap-2">
-                        {bm.incontinence && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">Incontinence</span>}
-                        {bm.bloodPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-600/20 text-red-400 border border-red-600/30">Blood Present</span>}
-                        {bm.mucusPresent && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Mucus Present</span>}
-                        {bm.painStraining && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">Pain / Straining</span>}
-                      </div>
-                    )}
-                    {bm.clinicalNote && (
-                      <p className="text-xs font-mono text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 leading-relaxed border border-border/50">{bm.clinicalNote}</p>
-                    )}
-                  </div>
-                );
-              })}
+              ))}
+            </div>
+
+            <div className="px-6 py-4 border-t border-border shrink-0">
+              <button
+                onClick={() => { setNoteText(""); setShowNoteModal(true); }}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Note
+              </button>
             </div>
           </>
         )}
       </aside>
+
+      {/* ── New Note Modal ────────────────────────────────────── */}
+      {showNoteModal && (
+        <>
+          <div
+            className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowNoteModal(false)}
+          />
+          <div className="fixed inset-x-4 top-[4vh] bottom-[4vh] z-[90] max-w-2xl mx-auto bg-card rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">New Clinical Note</h2>
+                {resident && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{resident.name} · Room {resident.room}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setShowNoteModal(false)}
+                className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 border-b border-border shrink-0">
+              <button className="w-full flex items-center justify-center gap-3 py-4 rounded-xl border-2 border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors font-semibold text-sm">
+                <Mic className="w-5 h-5" />
+                🎙️ Voice Dictation (AI) — Coming Soon
+              </button>
+            </div>
+
+            <div className="flex-1 px-6 pt-4 pb-2 overflow-hidden">
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder={"Begin typing your clinical note here…\n\nInclude: assessment findings, interventions, resident response, and plan."}
+                autoFocus
+                className="w-full h-full resize-none bg-transparent text-foreground text-sm leading-relaxed focus:outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+
+            <div className="px-6 py-4 border-t border-border shrink-0 flex gap-3">
+              <button
+                onClick={() => { setShowNoteModal(false); setNoteText(""); }}
+                disabled={!noteText.trim()}
+                className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4" />
+                Save & Sign Note
+              </button>
+              <button
+                onClick={() => setShowNoteModal(false)}
+                className="px-6 py-3.5 rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors text-sm font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
