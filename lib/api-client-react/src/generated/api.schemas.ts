@@ -13,6 +13,11 @@ export interface Resident {
   id: number;
   name: string;
   room: string;
+  isFavorited: boolean;
+}
+
+export interface FavoriteToggle {
+  isFavorited: boolean;
 }
 
 export interface BowelMovement {

@@ -9,6 +9,7 @@
 export * from "./bowelMovement";
 export * from "./bowelMovementInput";
 export * from "./bowelMovementInputAmount";
+export * from "./favoriteToggle";
 export * from "./healthStatus";
 export * from "./listBowelMovementsParams";
 export * from "./physicianSummary";

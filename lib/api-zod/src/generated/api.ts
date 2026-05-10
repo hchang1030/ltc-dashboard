@@ -22,8 +22,27 @@ export const ListResidentsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   room: zod.string(),
+  isFavorited: zod.boolean(),
 });
 export const ListResidentsResponse = zod.array(ListResidentsResponseItem);
+
+/**
+ * @summary Toggle a resident's favorited status
+ */
+export const ToggleFavoriteParams = zod.object({
+  residentId: zod.coerce.number(),
+});
+
+export const ToggleFavoriteBody = zod.object({
+  isFavorited: zod.boolean(),
+});
+
+export const ToggleFavoriteResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  room: zod.string(),
+  isFavorited: zod.boolean(),
+});
 
 /**
  * @summary List bowel movement events

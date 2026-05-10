@@ -6,9 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Resident {
-  id: number;
-  name: string;
-  room: string;
+export interface FavoriteToggle {
   isFavorited: boolean;
 }

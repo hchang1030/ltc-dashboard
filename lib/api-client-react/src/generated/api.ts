@@ -19,6 +19,7 @@ import type {
 import type {
   BowelMovement,
   BowelMovementInput,
+  FavoriteToggle,
   HealthStatus,
   ListBowelMovementsParams,
   PhysicianSummary,
@@ -184,6 +185,93 @@ export function useListResidents<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Toggle a resident's favorited status
+ */
+export const getToggleFavoriteUrl = (residentId: number) => {
+  return `/api/residents/${residentId}/favorite`;
+};
+
+export const toggleFavorite = async (
+  residentId: number,
+  favoriteToggle: FavoriteToggle,
+  options?: RequestInit,
+): Promise<Resident> => {
+  return customFetch<Resident>(getToggleFavoriteUrl(residentId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(favoriteToggle),
+  });
+};
+
+export const getToggleFavoriteMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toggleFavorite>>,
+    TError,
+    { residentId: number; data: BodyType<FavoriteToggle> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toggleFavorite>>,
+  TError,
+  { residentId: number; data: BodyType<FavoriteToggle> },
+  TContext
+> => {
+  const mutationKey = ["toggleFavorite"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toggleFavorite>>,
+    { residentId: number; data: BodyType<FavoriteToggle> }
+  > = (props) => {
+    const { residentId, data } = props ?? {};
+
+    return toggleFavorite(residentId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToggleFavoriteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toggleFavorite>>
+>;
+export type ToggleFavoriteMutationBody = BodyType<FavoriteToggle>;
+export type ToggleFavoriteMutationError = ErrorType<void>;
+
+/**
+ * @summary Toggle a resident's favorited status
+ */
+export const useToggleFavorite = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toggleFavorite>>,
+    TError,
+    { residentId: number; data: BodyType<FavoriteToggle> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof toggleFavorite>>,
+  TError,
+  { residentId: number; data: BodyType<FavoriteToggle> },
+  TContext
+> => {
+  return useMutation(getToggleFavoriteMutationOptions(options));
+};
 
 /**
  * @summary List bowel movement events

@@ -46,6 +46,33 @@ paths:
                 items:
                   $ref: "#/components/schemas/Resident"
 
+  /residents/{residentId}/favorite:
+    patch:
+      operationId: toggleFavorite
+      tags: [residents]
+      summary: Toggle a resident's favorited status
+      parameters:
+        - name: residentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FavoriteToggle"
+      responses:
+        "200":
+          description: Updated resident
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resident"
+        "404":
+          description: Resident not found
+
   /bowel-movements:
     get:
       operationId: listBowelMovements
@@ -111,7 +138,7 @@ components:
 
     Resident:
       type: object
-      required: [id, name, room]
+      required: [id, name, room, isFavorited]
       properties:
         id:
           type: integer
@@ -119,6 +146,15 @@ components:
           type: string
         room:
           type: string
+        isFavorited:
+          type: boolean
+
+    FavoriteToggle:
+      type: object
+      required: [isFavorited]
+      properties:
+        isFavorited:
+          type: boolean
 
     BowelMovement:
       type: object
