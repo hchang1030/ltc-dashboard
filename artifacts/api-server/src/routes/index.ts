@@ -11,6 +11,8 @@ import physicianRouter from "./physician";
 import communicationBinderRouter from "./communicationBinder";
 import contactDirectoryRouter from "./contactDirectory";
 import communicationLogsRouter from "./communicationLogs";
+import orderTemplatesRouter from "./orderTemplates";
+import residentOrdersRouter from "./residentOrders";
 
 const router: IRouter = Router();
 
@@ -26,5 +28,7 @@ router.use(physicianRouter);
 router.use(communicationBinderRouter);
 router.use(contactDirectoryRouter);
 router.use(communicationLogsRouter);
+router.use(orderTemplatesRouter);
+router.use(residentOrdersRouter);
 
 export default router;

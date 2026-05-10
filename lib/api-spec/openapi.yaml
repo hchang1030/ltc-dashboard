@@ -19,6 +19,7 @@ tags:
   - name: communicationBinder
   - name: contactDirectory
   - name: communications
+  - name: cpoe
 
 paths:
   /healthz:
@@ -403,6 +404,120 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PhysicianSummary"
+
+  /order-templates:
+    get:
+      operationId: listOrderTemplates
+      tags: [cpoe]
+      summary: List all order templates
+      parameters:
+        - name: favoritedOnly
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of order templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderTemplate"
+    post:
+      operationId: createOrderTemplate
+      tags: [cpoe]
+      summary: Create an order template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderTemplateInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderTemplate"
+
+  /order-templates/{templateId}:
+    patch:
+      operationId: updateOrderTemplate
+      tags: [cpoe]
+      summary: Update an order template (toggle favorite, edit content)
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderTemplateInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderTemplate"
+    delete:
+      operationId: deleteOrderTemplate
+      tags: [cpoe]
+      summary: Delete an order template
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /resident-orders:
+    post:
+      operationId: signResidentOrder
+      tags: [cpoe]
+      summary: Sign and transmit a resident order (saves order + logs communication)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResidentOrderInput"
+      responses:
+        "201":
+          description: Order signed and transmitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResidentOrder"
+    get:
+      operationId: listResidentOrders
+      tags: [cpoe]
+      summary: List resident orders, optionally filtered by resident
+      parameters:
+        - name: residentId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of resident orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResidentOrder"
 
 components:
   schemas:
@@ -879,3 +994,63 @@ components:
         generatedAt:
           type: string
           format: date-time
+
+    OrderTemplate:
+      type: object
+      required: [id, category, title, contentJson, isFavorited]
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+          enum: [Order Set, Single Med]
+        title:
+          type: string
+        contentJson:
+          type: string
+        isFavorited:
+          type: boolean
+
+    OrderTemplateInput:
+      type: object
+      required: [category, title, contentJson]
+      properties:
+        category:
+          type: string
+          enum: [Order Set, Single Med]
+        title:
+          type: string
+        contentJson:
+          type: string
+        isFavorited:
+          type: boolean
+
+    ResidentOrder:
+      type: object
+      required: [id, residentId, residentName, residentRoom, orderText, status, timestamp]
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        residentName:
+          type: string
+        residentRoom:
+          type: string
+        orderText:
+          type: string
+        status:
+          type: string
+          enum: [Pending, Faxed, Acknowledged]
+        timestamp:
+          type: string
+          format: date-time
+
+    ResidentOrderInput:
+      type: object
+      required: [residentId, orderText]
+      properties:
+        residentId:
+          type: integer
+        orderText:
+          type: string

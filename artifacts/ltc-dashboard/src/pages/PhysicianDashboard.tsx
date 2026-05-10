@@ -16,8 +16,14 @@ import {
   getListCommunicationsQueryKey,
   useListResidents,
   getListResidentsQueryKey,
+  useListOrderTemplates,
+  useSignResidentOrder,
+  useListResidentOrders,
+  useUpdateOrderTemplate,
+  getListOrderTemplatesQueryKey,
+  getListResidentOrdersQueryKey,
 } from "@workspace/api-client-react";
-import type { ResidentAlertSummary, BinderEntry, ContactDirectoryEntry, CommunicationLog } from "@workspace/api-client-react";
+import type { ResidentAlertSummary, BinderEntry, ContactDirectoryEntry, CommunicationLog, OrderTemplate } from "@workspace/api-client-react";
 import {
   Clock,
   RefreshCw,
@@ -26,6 +32,7 @@ import {
   CalendarX,
   X,
   ChevronRight,
+  ChevronDown,
   Droplet,
   Activity,
   Megaphone,
@@ -40,6 +47,10 @@ import {
   ArrowLeft,
   Mail,
   Smartphone,
+  Star,
+  FileText,
+  ClipboardList,
+  Stethoscope,
 } from "lucide-react";
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -1155,12 +1166,438 @@ function VirtualBinder() {
   );
 }
 
+// ── CPOE / Orders ─────────────────────────────────────────────────────────────
+
+interface TemplateAccordionProps {
+  template: OrderTemplate;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onAddAll: () => void;
+  onToggleFavorite: () => void;
+}
+
+function TemplateAccordion({
+  template,
+  isExpanded,
+  onToggle,
+  onAddAll,
+  onToggleFavorite,
+}: TemplateAccordionProps) {
+  let lines: string[] = [];
+  try {
+    lines = JSON.parse(template.contentJson) as string[];
+  } catch {
+    lines = [template.title];
+  }
+
+  return (
+    <div>
+      <div
+        onClick={onToggle}
+        className="w-full px-4 py-3.5 flex items-center gap-3 text-left cursor-pointer hover:bg-muted/40 transition-colors"
+      >
+        <ChevronDown
+          className={["w-4 h-4 text-muted-foreground shrink-0 transition-transform", isExpanded ? "rotate-180" : ""].join(" ")}
+        />
+        <span className="flex-1 font-semibold text-sm text-foreground">{template.title}</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+          className="shrink-0 p-1 rounded hover:bg-muted transition-colors"
+          title={template.isFavorited ? "Remove from favorites" : "Add to favorites"}
+        >
+          <Star
+            className={[
+              "w-4 h-4 transition-colors",
+              template.isFavorited ? "text-amber-400 fill-amber-400" : "text-muted-foreground/40 hover:text-amber-400",
+            ].join(" ")}
+          />
+        </button>
+      </div>
+      {isExpanded && (
+        <div className="bg-muted/20 px-4 pb-4 space-y-3">
+          <ul className="space-y-1 pt-1">
+            {lines.map((line, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
+                <span className="text-muted-foreground/60 mt-0.5 shrink-0">•</span>
+                <span className="font-mono leading-relaxed">{line}</span>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={onAddAll}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs bg-violet-600/20 border border-violet-600/30 text-violet-300 hover:bg-violet-600/30 transition-colors w-full justify-center"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add All to Draft
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrderHub() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const [residentQuery, setResidentQuery] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedResidentId, setSelectedResidentId] = useState<number | null>(null);
+  const [selectedResidentName, setSelectedResidentName] = useState("");
+  const [selectedResidentRoom, setSelectedResidentRoom] = useState("");
+  const [draftLines, setDraftLines] = useState<string[]>([]);
+  const [customOrder, setCustomOrder] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const { data: allResidents = [] } = useListResidents({
+    query: { queryKey: getListResidentsQueryKey() },
+  });
+
+  const { data: templates = [] } = useListOrderTemplates(undefined, {
+    query: { queryKey: getListOrderTemplatesQueryKey() },
+  });
+
+  const residentOrdersParams = selectedResidentId !== null ? { residentId: selectedResidentId } : undefined;
+  const { data: recentOrders = [] } = useListResidentOrders(residentOrdersParams, {
+    query: {
+      enabled: selectedResidentId !== null,
+      queryKey: getListResidentOrdersQueryKey(residentOrdersParams),
+    },
+  });
+
+  const toggleFav = useUpdateOrderTemplate({
+    mutation: {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getListOrderTemplatesQueryKey() });
+      },
+    },
+  });
+
+  const signOrder = useSignResidentOrder({
+    mutation: {
+      onSuccess: async (order) => {
+        const text = draftLines.join("\n");
+        try { await navigator.clipboard.writeText(text); } catch { /* clipboard may be unavailable */ }
+        setDraftLines([]);
+        void queryClient.invalidateQueries({ queryKey: getListResidentOrdersQueryKey(residentOrdersParams) });
+        toast({
+          title: "Order Signed & Transmitted",
+          description: `Faxed for ${order.residentName}. Note copied to clipboard.`,
+        });
+      },
+      onError: () => {
+        toast({ title: "Transmission Failed", description: "Could not sign the order. Please try again.", variant: "destructive" });
+      },
+    },
+  });
+
+  const filteredResidents = residentQuery.trim()
+    ? allResidents
+        .filter(
+          (r) =>
+            r.name.toLowerCase().includes(residentQuery.toLowerCase()) ||
+            r.room.toLowerCase().includes(residentQuery.toLowerCase()),
+        )
+        .slice(0, 8)
+    : [];
+
+  const favorites = templates.filter((t) => t.isFavorited);
+  const nonFavorites = templates.filter((t) => !t.isFavorited);
+
+  function addTemplateToDraft(t: OrderTemplate) {
+    try {
+      const lines = JSON.parse(t.contentJson) as string[];
+      setDraftLines((prev) => [...prev, ...lines.filter(Boolean)]);
+    } catch {
+      setDraftLines((prev) => [...prev, t.title]);
+    }
+  }
+
+  function removeDraftLine(idx: number) {
+    setDraftLines((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function handleSelectResident(id: number, name: string, room: string) {
+    setSelectedResidentId(id);
+    setSelectedResidentName(name);
+    setSelectedResidentRoom(room);
+    setResidentQuery("");
+    setShowDropdown(false);
+  }
+
+  function handleSign() {
+    if (selectedResidentId === null || draftLines.length === 0) return;
+    signOrder.mutate({ data: { residentId: selectedResidentId, orderText: draftLines.join("\n") } });
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="bg-violet-500/15 p-2.5 rounded-xl">
+          <Stethoscope className="w-5 h-5 text-violet-400" />
+        </div>
+        <div>
+          <h2 className="font-bold text-lg text-foreground">CPOE — Computerized Provider Order Entry</h2>
+          <p className="text-xs text-muted-foreground">Select a resident, build an order from templates or free text, then sign &amp; transmit.</p>
+        </div>
+      </div>
+
+      {/* Resident Picker */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Patient</p>
+        {selectedResidentId !== null ? (
+          <div className="flex items-center gap-3">
+            <div className="flex-1 flex items-center gap-3 bg-violet-500/10 border border-violet-500/30 rounded-xl px-4 py-3">
+              <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+                <span className="text-violet-400 font-bold text-xs">{selectedResidentName.slice(0, 2).toUpperCase()}</span>
+              </div>
+              <div>
+                <p className="font-bold text-foreground text-sm">{selectedResidentName}</p>
+                <p className="text-xs text-muted-foreground font-mono">Room {selectedResidentRoom}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setSelectedResidentId(null); setSelectedResidentName(""); setSelectedResidentRoom(""); setDraftLines([]); }}
+              className="p-2 rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Clear selection"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="relative">
+            <input
+              value={residentQuery}
+              onChange={(e) => { setResidentQuery(e.target.value); setShowDropdown(true); }}
+              onFocus={() => { if (residentQuery) setShowDropdown(true); }}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+              placeholder="Search by name or room number…"
+              className="w-full bg-muted border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/50"
+            />
+            {showDropdown && filteredResidents.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-xl z-30 overflow-hidden">
+                {filteredResidents.map((r) => (
+                  <button
+                    key={r.id}
+                    onMouseDown={() => handleSelectResident(r.id, r.name, r.room)}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted text-left transition-colors"
+                  >
+                    <span className="font-medium text-sm text-foreground">{r.name}</span>
+                    <span className="text-xs text-muted-foreground font-mono">Room {r.room}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Two-column layout */}
+      <div className="grid grid-cols-2 gap-5">
+        {/* Column A: Order Sets */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-muted-foreground" />
+            <h3 className="font-bold text-sm text-foreground">Order Sets &amp; Favorites</h3>
+          </div>
+          <div className="divide-y divide-border/60">
+            {favorites.length > 0 && (
+              <div className="bg-amber-950/20">
+                <div className="px-4 py-2.5 flex items-center gap-2">
+                  <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-amber-400">Favorites</span>
+                </div>
+                {favorites.map((t) => (
+                  <TemplateAccordion
+                    key={t.id}
+                    template={t}
+                    isExpanded={expandedId === t.id}
+                    onToggle={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                    onAddAll={() => addTemplateToDraft(t)}
+                    onToggleFavorite={() =>
+                      toggleFav.mutate({
+                        templateId: t.id,
+                        data: { category: t.category as "Order Set" | "Single Med", title: t.title, contentJson: t.contentJson, isFavorited: !t.isFavorited },
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+            {nonFavorites.map((t) => (
+              <TemplateAccordion
+                key={t.id}
+                template={t}
+                isExpanded={expandedId === t.id}
+                onToggle={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                onAddAll={() => addTemplateToDraft(t)}
+                onToggleFavorite={() =>
+                  toggleFav.mutate({
+                    templateId: t.id,
+                    data: { category: t.category as "Order Set" | "Single Med", title: t.title, contentJson: t.contentJson, isFavorited: !t.isFavorited },
+                  })
+                }
+              />
+            ))}
+            {templates.length === 0 && (
+              <p className="text-muted-foreground text-sm text-center py-8">No order templates found.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Column B: Custom Order + Recent Orders */}
+        <div className="space-y-4">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center gap-2">
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+              <h3 className="font-bold text-sm text-foreground">Custom Order</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <textarea
+                value={customOrder}
+                onChange={(e) => setCustomOrder(e.target.value)}
+                placeholder="Enter a free-text order (e.g. Metformin 500mg PO BID)…"
+                rows={4}
+                className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/50 resize-none font-mono"
+              />
+              <button
+                disabled={!customOrder.trim()}
+                onClick={() => { setDraftLines((prev) => [...prev, customOrder.trim()]); setCustomOrder(""); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-violet-600/20 border border-violet-600/30 text-violet-300 hover:bg-violet-600/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add to Draft
+              </button>
+            </div>
+          </div>
+
+          {selectedResidentId !== null && (
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-muted-foreground" />
+                <h3 className="font-bold text-sm text-foreground">Recent Orders — {selectedResidentName}</h3>
+              </div>
+              <div className="divide-y divide-border/50 max-h-56 overflow-y-auto">
+                {recentOrders.length === 0 && (
+                  <p className="text-muted-foreground text-sm text-center py-6">No orders on record.</p>
+                )}
+                {recentOrders.slice(0, 5).map((order) => (
+                  <div key={order.id} className="px-4 py-3 flex items-start gap-3">
+                    <span
+                      className={[
+                        "mt-0.5 shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                        order.status === "Faxed"
+                          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                          : order.status === "Acknowledged"
+                          ? "bg-primary/15 text-primary border-primary/30"
+                          : "bg-muted text-muted-foreground border-border",
+                      ].join(" ")}
+                    >
+                      {order.status}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {new Date(order.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}
+                      </p>
+                      <p className="text-xs text-foreground/80 font-mono mt-0.5 truncate">{order.orderText.split("\n")[0]}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Active Draft */}
+      <div className="bg-card border-2 border-violet-600/30 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-violet-600/20 bg-violet-950/20 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-violet-400" />
+            <h3 className="font-bold text-sm text-violet-300">Active Draft</h3>
+            {draftLines.length > 0 && (
+              <span className="bg-violet-500/20 border border-violet-500/30 text-violet-300 text-xs font-bold px-2 py-0.5 rounded-full">
+                {draftLines.length} {draftLines.length === 1 ? "item" : "items"}
+              </span>
+            )}
+          </div>
+          {draftLines.length > 0 && (
+            <button
+              onClick={() => setDraftLines([])}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-muted-foreground border border-border hover:bg-muted transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="p-4 min-h-[100px]">
+          {draftLines.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+              <p className="text-muted-foreground text-sm">Draft is empty</p>
+              <p className="text-muted-foreground/60 text-xs">
+                Expand an order set and click "Add All to Draft", or write a custom order above.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {draftLines.map((line, idx) => (
+                <li key={idx} className="flex items-start gap-2 group">
+                  <span className="text-violet-500/60 font-mono text-xs mt-1 shrink-0 w-5 text-right">{idx + 1}.</span>
+                  <span className="flex-1 text-sm font-mono text-foreground/90 bg-muted/40 rounded-lg px-3 py-1.5 border border-border/50 leading-relaxed">
+                    {line}
+                  </span>
+                  <button
+                    onClick={() => removeDraftLine(idx)}
+                    className="opacity-0 group-hover:opacity-100 shrink-0 p-1 rounded hover:bg-red-600/20 text-muted-foreground hover:text-red-400 transition-all mt-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="px-4 py-4 border-t border-violet-600/20 bg-violet-950/10 flex items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground italic">
+            {selectedResidentId === null
+              ? "Select a resident above to enable signing."
+              : draftLines.length === 0
+              ? "Add at least one order to the draft to sign."
+              : (
+                <>
+                  Ready to transmit{" "}
+                  <span className="font-bold text-foreground not-italic">{draftLines.length} order{draftLines.length !== 1 ? "s" : ""}</span>
+                  {" "}for{" "}
+                  <span className="font-bold text-violet-300 not-italic">{selectedResidentName}</span>.
+                </>
+              )}
+          </p>
+          <button
+            onClick={handleSign}
+            disabled={selectedResidentId === null || draftLines.length === 0 || signOrder.isPending}
+            className="shrink-0 flex items-center gap-2.5 px-6 py-2.5 rounded-xl font-bold text-sm bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            {signOrder.isPending ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            Sign &amp; Transmit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
   const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
-  const [view, setView] = useState<"population" | "binder" | "directory">("population");
+  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe">("population");
 
   const { data, isLoading, isError, refetch, isFetching } = useGetPhysicianSummary({
     query: { refetchInterval: 60_000, queryKey: getGetPhysicianSummaryQueryKey() },
@@ -1252,12 +1689,25 @@ export default function PhysicianDashboard() {
             <Send className="w-4 h-4" />
             Comm Hub
           </button>
+          <button
+            onClick={() => setView("cpoe")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "cpoe"
+                ? "bg-violet-700/20 border-violet-500 text-violet-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-violet-500/40",
+            ].join(" ")}
+          >
+            <Stethoscope className="w-4 h-4" />
+            CPOE
+          </button>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto p-8 space-y-8">
         {view === "binder" && <VirtualBinder />}
         {view === "directory" && <CommHubView />}
+        {view === "cpoe" && <OrderHub />}
 
         {view === "population" && alertCounts && (
           <section className="grid grid-cols-3 gap-4">

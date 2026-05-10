@@ -344,3 +344,88 @@ export const GetPhysicianSummaryResponse = zod.object({
   facilityMonthlyBlood: zod.number(),
   generatedAt: zod.coerce.date(),
 });
+
+/**
+ * @summary List all order templates
+ */
+export const ListOrderTemplatesQueryParams = zod.object({
+  favoritedOnly: zod.coerce.boolean().optional(),
+});
+
+export const ListOrderTemplatesResponseItem = zod.object({
+  id: zod.number(),
+  category: zod.enum(["Order Set", "Single Med"]),
+  title: zod.string(),
+  contentJson: zod.string(),
+  isFavorited: zod.boolean(),
+});
+export const ListOrderTemplatesResponse = zod.array(
+  ListOrderTemplatesResponseItem,
+);
+
+/**
+ * @summary Create an order template
+ */
+export const CreateOrderTemplateBody = zod.object({
+  category: zod.enum(["Order Set", "Single Med"]),
+  title: zod.string(),
+  contentJson: zod.string(),
+  isFavorited: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update an order template (toggle favorite, edit content)
+ */
+export const UpdateOrderTemplateParams = zod.object({
+  templateId: zod.coerce.number(),
+});
+
+export const UpdateOrderTemplateBody = zod.object({
+  category: zod.enum(["Order Set", "Single Med"]),
+  title: zod.string(),
+  contentJson: zod.string(),
+  isFavorited: zod.boolean().optional(),
+});
+
+export const UpdateOrderTemplateResponse = zod.object({
+  id: zod.number(),
+  category: zod.enum(["Order Set", "Single Med"]),
+  title: zod.string(),
+  contentJson: zod.string(),
+  isFavorited: zod.boolean(),
+});
+
+/**
+ * @summary Delete an order template
+ */
+export const DeleteOrderTemplateParams = zod.object({
+  templateId: zod.coerce.number(),
+});
+
+/**
+ * @summary Sign and transmit a resident order (saves order + logs communication)
+ */
+export const SignResidentOrderBody = zod.object({
+  residentId: zod.number(),
+  orderText: zod.string(),
+});
+
+/**
+ * @summary List resident orders, optionally filtered by resident
+ */
+export const ListResidentOrdersQueryParams = zod.object({
+  residentId: zod.coerce.number().optional(),
+});
+
+export const ListResidentOrdersResponseItem = zod.object({
+  id: zod.number(),
+  residentId: zod.number(),
+  residentName: zod.string(),
+  residentRoom: zod.string(),
+  orderText: zod.string(),
+  status: zod.enum(["Pending", "Faxed", "Acknowledged"]),
+  timestamp: zod.coerce.date(),
+});
+export const ListResidentOrdersResponse = zod.array(
+  ListResidentOrdersResponseItem,
+);

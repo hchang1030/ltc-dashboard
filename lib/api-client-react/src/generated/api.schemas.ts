@@ -377,6 +377,61 @@ export interface PhysicianSummary {
   generatedAt: string;
 }
 
+export type OrderTemplateCategory =
+  (typeof OrderTemplateCategory)[keyof typeof OrderTemplateCategory];
+
+export const OrderTemplateCategory = {
+  Order_Set: "Order Set",
+  Single_Med: "Single Med",
+} as const;
+
+export interface OrderTemplate {
+  id: number;
+  category: OrderTemplateCategory;
+  title: string;
+  contentJson: string;
+  isFavorited: boolean;
+}
+
+export type OrderTemplateInputCategory =
+  (typeof OrderTemplateInputCategory)[keyof typeof OrderTemplateInputCategory];
+
+export const OrderTemplateInputCategory = {
+  Order_Set: "Order Set",
+  Single_Med: "Single Med",
+} as const;
+
+export interface OrderTemplateInput {
+  category: OrderTemplateInputCategory;
+  title: string;
+  contentJson: string;
+  isFavorited?: boolean;
+}
+
+export type ResidentOrderStatus =
+  (typeof ResidentOrderStatus)[keyof typeof ResidentOrderStatus];
+
+export const ResidentOrderStatus = {
+  Pending: "Pending",
+  Faxed: "Faxed",
+  Acknowledged: "Acknowledged",
+} as const;
+
+export interface ResidentOrder {
+  id: number;
+  residentId: number;
+  residentName: string;
+  residentRoom: string;
+  orderText: string;
+  status: ResidentOrderStatus;
+  timestamp: string;
+}
+
+export interface ResidentOrderInput {
+  residentId: number;
+  orderText: string;
+}
+
 export type ListCommunicationsParams = {
   residentId?: number;
 };
@@ -396,3 +451,11 @@ export const ListBinderEntriesStatus = {
   Active: "Active",
   Resolved: "Resolved",
 } as const;
+
+export type ListOrderTemplatesParams = {
+  favoritedOnly?: boolean;
+};
+
+export type ListResidentOrdersParams = {
+  residentId?: number;
+};

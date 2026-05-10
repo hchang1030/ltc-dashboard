@@ -36,10 +36,16 @@ import type {
   ListBinderEntriesParams,
   ListBowelMovementsParams,
   ListCommunicationsParams,
+  ListOrderTemplatesParams,
+  ListResidentOrdersParams,
+  OrderTemplate,
+  OrderTemplateInput,
   PainEvent,
   PainEventInput,
   PhysicianSummary,
   Resident,
+  ResidentOrder,
+  ResidentOrderInput,
   VitalEvent,
   VitalEventInput,
 } from "./api.schemas";
@@ -1836,6 +1842,543 @@ export function useGetPhysicianSummary<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetPhysicianSummaryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List all order templates
+ */
+export const getListOrderTemplatesUrl = (params?: ListOrderTemplatesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/order-templates?${stringifiedParams}`
+    : `/api/order-templates`;
+};
+
+export const listOrderTemplates = async (
+  params?: ListOrderTemplatesParams,
+  options?: RequestInit,
+): Promise<OrderTemplate[]> => {
+  return customFetch<OrderTemplate[]>(getListOrderTemplatesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListOrderTemplatesQueryKey = (
+  params?: ListOrderTemplatesParams,
+) => {
+  return [`/api/order-templates`, ...(params ? [params] : [])] as const;
+};
+
+export const getListOrderTemplatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOrderTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListOrderTemplatesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listOrderTemplates>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListOrderTemplatesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listOrderTemplates>>
+  > = ({ signal }) => listOrderTemplates(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listOrderTemplates>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListOrderTemplatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOrderTemplates>>
+>;
+export type ListOrderTemplatesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all order templates
+ */
+
+export function useListOrderTemplates<
+  TData = Awaited<ReturnType<typeof listOrderTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListOrderTemplatesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listOrderTemplates>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListOrderTemplatesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create an order template
+ */
+export const getCreateOrderTemplateUrl = () => {
+  return `/api/order-templates`;
+};
+
+export const createOrderTemplate = async (
+  orderTemplateInput: OrderTemplateInput,
+  options?: RequestInit,
+): Promise<OrderTemplate> => {
+  return customFetch<OrderTemplate>(getCreateOrderTemplateUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(orderTemplateInput),
+  });
+};
+
+export const getCreateOrderTemplateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOrderTemplate>>,
+    TError,
+    { data: BodyType<OrderTemplateInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createOrderTemplate>>,
+  TError,
+  { data: BodyType<OrderTemplateInput> },
+  TContext
+> => {
+  const mutationKey = ["createOrderTemplate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createOrderTemplate>>,
+    { data: BodyType<OrderTemplateInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createOrderTemplate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateOrderTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createOrderTemplate>>
+>;
+export type CreateOrderTemplateMutationBody = BodyType<OrderTemplateInput>;
+export type CreateOrderTemplateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create an order template
+ */
+export const useCreateOrderTemplate = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOrderTemplate>>,
+    TError,
+    { data: BodyType<OrderTemplateInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createOrderTemplate>>,
+  TError,
+  { data: BodyType<OrderTemplateInput> },
+  TContext
+> => {
+  return useMutation(getCreateOrderTemplateMutationOptions(options));
+};
+
+/**
+ * @summary Update an order template (toggle favorite, edit content)
+ */
+export const getUpdateOrderTemplateUrl = (templateId: number) => {
+  return `/api/order-templates/${templateId}`;
+};
+
+export const updateOrderTemplate = async (
+  templateId: number,
+  orderTemplateInput: OrderTemplateInput,
+  options?: RequestInit,
+): Promise<OrderTemplate> => {
+  return customFetch<OrderTemplate>(getUpdateOrderTemplateUrl(templateId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(orderTemplateInput),
+  });
+};
+
+export const getUpdateOrderTemplateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateOrderTemplate>>,
+    TError,
+    { templateId: number; data: BodyType<OrderTemplateInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateOrderTemplate>>,
+  TError,
+  { templateId: number; data: BodyType<OrderTemplateInput> },
+  TContext
+> => {
+  const mutationKey = ["updateOrderTemplate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateOrderTemplate>>,
+    { templateId: number; data: BodyType<OrderTemplateInput> }
+  > = (props) => {
+    const { templateId, data } = props ?? {};
+
+    return updateOrderTemplate(templateId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateOrderTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateOrderTemplate>>
+>;
+export type UpdateOrderTemplateMutationBody = BodyType<OrderTemplateInput>;
+export type UpdateOrderTemplateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update an order template (toggle favorite, edit content)
+ */
+export const useUpdateOrderTemplate = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateOrderTemplate>>,
+    TError,
+    { templateId: number; data: BodyType<OrderTemplateInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateOrderTemplate>>,
+  TError,
+  { templateId: number; data: BodyType<OrderTemplateInput> },
+  TContext
+> => {
+  return useMutation(getUpdateOrderTemplateMutationOptions(options));
+};
+
+/**
+ * @summary Delete an order template
+ */
+export const getDeleteOrderTemplateUrl = (templateId: number) => {
+  return `/api/order-templates/${templateId}`;
+};
+
+export const deleteOrderTemplate = async (
+  templateId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteOrderTemplateUrl(templateId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteOrderTemplateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOrderTemplate>>,
+    TError,
+    { templateId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteOrderTemplate>>,
+  TError,
+  { templateId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteOrderTemplate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteOrderTemplate>>,
+    { templateId: number }
+  > = (props) => {
+    const { templateId } = props ?? {};
+
+    return deleteOrderTemplate(templateId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteOrderTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteOrderTemplate>>
+>;
+
+export type DeleteOrderTemplateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete an order template
+ */
+export const useDeleteOrderTemplate = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOrderTemplate>>,
+    TError,
+    { templateId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteOrderTemplate>>,
+  TError,
+  { templateId: number },
+  TContext
+> => {
+  return useMutation(getDeleteOrderTemplateMutationOptions(options));
+};
+
+/**
+ * @summary Sign and transmit a resident order (saves order + logs communication)
+ */
+export const getSignResidentOrderUrl = () => {
+  return `/api/resident-orders`;
+};
+
+export const signResidentOrder = async (
+  residentOrderInput: ResidentOrderInput,
+  options?: RequestInit,
+): Promise<ResidentOrder> => {
+  return customFetch<ResidentOrder>(getSignResidentOrderUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(residentOrderInput),
+  });
+};
+
+export const getSignResidentOrderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof signResidentOrder>>,
+    TError,
+    { data: BodyType<ResidentOrderInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof signResidentOrder>>,
+  TError,
+  { data: BodyType<ResidentOrderInput> },
+  TContext
+> => {
+  const mutationKey = ["signResidentOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof signResidentOrder>>,
+    { data: BodyType<ResidentOrderInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return signResidentOrder(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SignResidentOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof signResidentOrder>>
+>;
+export type SignResidentOrderMutationBody = BodyType<ResidentOrderInput>;
+export type SignResidentOrderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Sign and transmit a resident order (saves order + logs communication)
+ */
+export const useSignResidentOrder = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof signResidentOrder>>,
+    TError,
+    { data: BodyType<ResidentOrderInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof signResidentOrder>>,
+  TError,
+  { data: BodyType<ResidentOrderInput> },
+  TContext
+> => {
+  return useMutation(getSignResidentOrderMutationOptions(options));
+};
+
+/**
+ * @summary List resident orders, optionally filtered by resident
+ */
+export const getListResidentOrdersUrl = (params?: ListResidentOrdersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/resident-orders?${stringifiedParams}`
+    : `/api/resident-orders`;
+};
+
+export const listResidentOrders = async (
+  params?: ListResidentOrdersParams,
+  options?: RequestInit,
+): Promise<ResidentOrder[]> => {
+  return customFetch<ResidentOrder[]>(getListResidentOrdersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListResidentOrdersQueryKey = (
+  params?: ListResidentOrdersParams,
+) => {
+  return [`/api/resident-orders`, ...(params ? [params] : [])] as const;
+};
+
+export const getListResidentOrdersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listResidentOrders>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListResidentOrdersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listResidentOrders>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListResidentOrdersQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listResidentOrders>>
+  > = ({ signal }) => listResidentOrders(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listResidentOrders>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListResidentOrdersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listResidentOrders>>
+>;
+export type ListResidentOrdersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List resident orders, optionally filtered by resident
+ */
+
+export function useListResidentOrders<
+  TData = Awaited<ReturnType<typeof listResidentOrders>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListResidentOrdersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listResidentOrders>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListResidentOrdersQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
