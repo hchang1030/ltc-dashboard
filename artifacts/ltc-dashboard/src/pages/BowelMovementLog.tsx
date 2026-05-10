@@ -271,14 +271,13 @@ function ResidentList({ onSelect }: ResidentListProps) {
               <li
                 key={resident.id}
                 data-testid={`row-resident-${resident.id}`}
-                className="flex items-center gap-3 px-4 hover:bg-card/60 transition-colors cursor-pointer group"
-                onClick={() => onSelect(resident)}
+                className="flex items-center gap-3 px-4 border-b border-border/40 last:border-0"
               >
                 {/* Star button — 44×44 tap target */}
                 <button
                   data-testid={`btn-star-${resident.id}`}
                   onClick={(e) => handleStarClick(e, resident)}
-                  className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 hover:bg-amber-500/10 transition-colors"
+                  className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 hover:bg-amber-500/10 active:bg-amber-500/20 transition-colors"
                   aria-label={resident.isFavorited ? "Remove from My Patients" : "Add to My Patients"}
                 >
                   <Star
@@ -286,7 +285,7 @@ function ResidentList({ onSelect }: ResidentListProps) {
                       "w-6 h-6 transition-colors",
                       resident.isFavorited
                         ? "fill-amber-400 text-amber-400"
-                        : "text-muted-foreground/40 group-hover:text-amber-400/60",
+                        : "text-muted-foreground/30",
                     ].join(" ")}
                   />
                 </button>
@@ -296,16 +295,22 @@ function ResidentList({ onSelect }: ResidentListProps) {
                   {resident.room}
                 </span>
 
-                {/* Name */}
-                <span className="flex-1 font-semibold text-foreground py-5 text-base truncate">
-                  {resident.name}
-                </span>
+                {/* Name + gut badge stacked */}
+                <div className="flex-1 min-w-0 py-4">
+                  <p className="font-semibold text-foreground text-base truncate">{resident.name}</p>
+                  <div className="mt-1">
+                    <GutBadge level={alertMap[resident.id] ?? "unknown"} />
+                  </div>
+                </div>
 
-                {/* Gut status badge */}
-                <GutBadge level={alertMap[resident.id] ?? "unknown"} />
-
-                {/* Chevron */}
-                <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary shrink-0 ml-1" />
+                {/* Tap-to-log button — large, obvious */}
+                <button
+                  onClick={() => onSelect(resident)}
+                  className="shrink-0 flex items-center gap-1.5 bg-primary hover:bg-primary/80 active:scale-95 text-primary-foreground font-bold text-sm px-4 py-3 rounded-xl transition-all shadow-md shadow-primary/20"
+                >
+                  Log BM
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </li>
             );
           })}
