@@ -99,69 +99,69 @@ function ScrollPicker<T extends string | number>({
   const containerRef = useRef<HTMLDivElement>(null);
   const suppressRef = useRef(false);
 
-  const scrollToIndex = useCallback((idx: number, smooth = false) => {
+  // scrollTop = realIndex * ITEM_H  (sentinels handle the virtual padding)
+  const scrollToReal = useCallback((realIdx: number, smooth = false) => {
     const el = containerRef.current;
     if (!el) return;
     suppressRef.current = true;
-    el.scrollTo({ top: idx * ITEM_H, behavior: smooth ? "smooth" : "instant" });
-    setTimeout(() => { suppressRef.current = false; }, 150);
+    el.scrollTo({ top: realIdx * ITEM_H, behavior: smooth ? "smooth" : "instant" });
+    setTimeout(() => { suppressRef.current = false; }, 200);
   }, []);
 
   useEffect(() => {
     const idx = items.findIndex((i) => i.value === value);
-    if (idx >= 0) scrollToIndex(idx, false);
-  }, []);
+    if (idx >= 0) scrollToReal(idx, false);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleScroll = useCallback(() => {
     if (suppressRef.current) return;
     const el = containerRef.current;
     if (!el) return;
-    const idx = Math.min(Math.round(el.scrollTop / ITEM_H), items.length - 1);
-    if (items[idx].value !== value) onChange(items[idx].value);
+    const realIdx = Math.max(0, Math.min(Math.round(el.scrollTop / ITEM_H), items.length - 1));
+    if (items[realIdx].value !== value) onChange(items[realIdx].value);
   }, [items, value, onChange]);
 
   return (
     <div className="relative rounded-xl overflow-hidden bg-card border border-border" style={{ height: ITEM_H * 3 }}>
       {/* Top fade */}
-      <div className="absolute inset-x-0 top-0 pointer-events-none z-10" style={{ height: ITEM_H, background: "linear-gradient(to bottom, var(--card) 30%, transparent)" }} />
+      <div className="absolute inset-x-0 top-0 pointer-events-none z-10"
+        style={{ height: ITEM_H, background: "linear-gradient(to bottom, var(--card) 40%, transparent)" }} />
       {/* Bottom fade */}
-      <div className="absolute inset-x-0 bottom-0 pointer-events-none z-10" style={{ height: ITEM_H, background: "linear-gradient(to top, var(--card) 30%, transparent)" }} />
-      {/* Selection highlight */}
-      <div className="absolute inset-x-0 z-10 pointer-events-none border-y-2 border-primary/40 bg-primary/8" style={{ top: ITEM_H, height: ITEM_H }} />
-      {/* Scroll container */}
+      <div className="absolute inset-x-0 bottom-0 pointer-events-none z-10"
+        style={{ height: ITEM_H, background: "linear-gradient(to top, var(--card) 40%, transparent)" }} />
+      {/* Centre highlight band */}
+      <div className="absolute inset-x-0 z-10 pointer-events-none border-y-2 border-primary/40"
+        style={{ top: ITEM_H, height: ITEM_H, background: "hsl(var(--primary) / 0.08)" }} />
+
       <div
         ref={containerRef}
         onScroll={handleScroll}
         className="absolute inset-0 overflow-y-scroll"
-        style={{
-          scrollSnapType: "y mandatory",
-          scrollbarWidth: "none",
-          paddingTop: ITEM_H,
-          paddingBottom: ITEM_H,
-        }}
+        style={{ scrollSnapType: "y mandatory", scrollbarWidth: "none" }}
       >
+        {/* Top sentinel: gives index 0 room to sit in the centre at scrollTop = 0 */}
+        <div style={{ height: ITEM_H, scrollSnapAlign: "none", flexShrink: 0 }} />
+
         {items.map((item, i) => (
           <div
             key={i}
-            style={{ height: ITEM_H, scrollSnapAlign: "start" }}
+            style={{ height: ITEM_H, scrollSnapAlign: "center" }}
             className="flex items-center justify-center cursor-pointer select-none"
-            onClick={() => {
-              onChange(item.value);
-              scrollToIndex(i, true);
-            }}
+            onClick={() => { onChange(item.value); scrollToReal(i, true); }}
           >
-            <span
-              className={[
-                "font-bold transition-all duration-150",
-                item.value === value
-                  ? "text-foreground text-xl"
-                  : "text-muted-foreground/50 text-base",
-              ].join(" ")}
-            >
+            <span className={[
+              "font-bold transition-all duration-150 text-center px-2",
+              item.value === value
+                ? "text-foreground text-xl"
+                : "text-muted-foreground/50 text-base",
+            ].join(" ")}>
               {item.label}
             </span>
           </div>
         ))}
+
+        {/* Bottom sentinel: gives the last index room to sit in the centre */}
+        <div style={{ height: ITEM_H, scrollSnapAlign: "none", flexShrink: 0 }} />
       </div>
     </div>
   );
