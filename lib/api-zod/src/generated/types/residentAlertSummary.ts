@@ -18,4 +18,8 @@ export interface ResidentAlertSummary {
   hoursSinceLastBM: number | null;
   monthlyGapCount: number;
   monthlyBloodCount: number;
+  hasSeverePain: boolean;
+  behaviorEventCount24h: number;
+  hasFall24h: boolean;
+  hasAbnormalVital24h: boolean;
 }

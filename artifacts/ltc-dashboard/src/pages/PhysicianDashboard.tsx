@@ -394,7 +394,7 @@ export default function PhysicianDashboard() {
               <table className="w-full" data-testid="table-residents">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    {["Alert", "Resident", "Room", "Last BM", "Elapsed", "48h Gaps (Mo.)", "Blood Events (Mo.)", ""].map((h) => (
+                    {["Alert", "Resident", "Room", "Last BM", "Elapsed", "48h Gaps (Mo.)", "Blood Events (Mo.)", "Clinical Alerts (24h)", ""].map((h) => (
                       <th
                         key={h}
                         className="text-left px-6 py-4 text-xs uppercase tracking-widest text-muted-foreground font-bold last:w-8"
@@ -469,6 +469,25 @@ export default function PhysicianDashboard() {
                           <span className={["text-lg font-bold", resident.monthlyBloodCount > 0 ? "text-red-400" : "text-muted-foreground"].join(" ")}>
                             {resident.monthlyBloodCount}
                           </span>
+                        </td>
+                        <td className="px-4 py-5">
+                          <div className="flex items-center gap-0.5 flex-wrap min-w-[80px]">
+                            {(isRed || isAmber) && (
+                              <span title={`No BM for ${resident.hoursSinceLastBM !== null ? Math.round(resident.hoursSinceLastBM) : "?"}h`} className="text-lg leading-none">💩</span>
+                            )}
+                            {resident.hasSeverePain && (
+                              <span title="Severe pain recorded in last 24h" className="text-lg leading-none">💥</span>
+                            )}
+                            {resident.behaviorEventCount24h >= 2 && (
+                              <span title={`${resident.behaviorEventCount24h} behavior events in last 24h`} className="text-lg leading-none">🧠</span>
+                            )}
+                            {resident.hasFall24h && (
+                              <span title="Fall event recorded in last 24h" className="text-lg leading-none">⚠️</span>
+                            )}
+                            {resident.hasAbnormalVital24h && (
+                              <span title="Abnormal vitals in last 24h" className="text-lg leading-none">📉</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-5">
                           <ChevronRight className={["w-4 h-4 text-muted-foreground/40 transition-transform group-hover:text-primary", isSelected ? "rotate-180 text-primary" : ""].join(" ")} />

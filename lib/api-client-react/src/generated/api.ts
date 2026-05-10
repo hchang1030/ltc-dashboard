@@ -17,13 +17,23 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  BehaviorEvent,
+  BehaviorEventInput,
   BowelMovement,
   BowelMovementInput,
+  FallEvent,
+  FallEventInput,
   FavoriteToggle,
   HealthStatus,
+  IntakeEvent,
+  IntakeEventInput,
   ListBowelMovementsParams,
+  PainEvent,
+  PainEventInput,
   PhysicianSummary,
   Resident,
+  VitalEvent,
+  VitalEventInput,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -36,7 +46,6 @@ type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const getHealthCheckUrl = () => {
@@ -207,7 +216,7 @@ export const toggleFavorite = async (
 };
 
 export const getToggleFavoriteMutationOptions = <
-  TError = ErrorType<void>,
+  TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -248,13 +257,13 @@ export type ToggleFavoriteMutationResult = NonNullable<
   Awaited<ReturnType<typeof toggleFavorite>>
 >;
 export type ToggleFavoriteMutationBody = BodyType<FavoriteToggle>;
-export type ToggleFavoriteMutationError = ErrorType<void>;
+export type ToggleFavoriteMutationError = ErrorType<unknown>;
 
 /**
  * @summary Toggle a resident's favorited status
  */
 export const useToggleFavorite = <
-  TError = ErrorType<void>,
+  TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -390,7 +399,7 @@ export const createBowelMovement = async (
 };
 
 export const getCreateBowelMovementMutationOptions = <
-  TError = ErrorType<void>,
+  TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -431,13 +440,13 @@ export type CreateBowelMovementMutationResult = NonNullable<
   Awaited<ReturnType<typeof createBowelMovement>>
 >;
 export type CreateBowelMovementMutationBody = BodyType<BowelMovementInput>;
-export type CreateBowelMovementMutationError = ErrorType<void>;
+export type CreateBowelMovementMutationError = ErrorType<unknown>;
 
 /**
  * @summary Record a bowel movement event
  */
 export const useCreateBowelMovement = <
-  TError = ErrorType<void>,
+  TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -454,6 +463,436 @@ export const useCreateBowelMovement = <
   TContext
 > => {
   return useMutation(getCreateBowelMovementMutationOptions(options));
+};
+
+/**
+ * @summary Record a pain event
+ */
+export const getCreatePainEventUrl = () => {
+  return `/api/pain-events`;
+};
+
+export const createPainEvent = async (
+  painEventInput: PainEventInput,
+  options?: RequestInit,
+): Promise<PainEvent> => {
+  return customFetch<PainEvent>(getCreatePainEventUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(painEventInput),
+  });
+};
+
+export const getCreatePainEventMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPainEvent>>,
+    TError,
+    { data: BodyType<PainEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPainEvent>>,
+  TError,
+  { data: BodyType<PainEventInput> },
+  TContext
+> => {
+  const mutationKey = ["createPainEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPainEvent>>,
+    { data: BodyType<PainEventInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPainEvent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePainEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPainEvent>>
+>;
+export type CreatePainEventMutationBody = BodyType<PainEventInput>;
+export type CreatePainEventMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Record a pain event
+ */
+export const useCreatePainEvent = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPainEvent>>,
+    TError,
+    { data: BodyType<PainEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPainEvent>>,
+  TError,
+  { data: BodyType<PainEventInput> },
+  TContext
+> => {
+  return useMutation(getCreatePainEventMutationOptions(options));
+};
+
+/**
+ * @summary Record a behavior event
+ */
+export const getCreateBehaviorEventUrl = () => {
+  return `/api/behavior-events`;
+};
+
+export const createBehaviorEvent = async (
+  behaviorEventInput: BehaviorEventInput,
+  options?: RequestInit,
+): Promise<BehaviorEvent> => {
+  return customFetch<BehaviorEvent>(getCreateBehaviorEventUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(behaviorEventInput),
+  });
+};
+
+export const getCreateBehaviorEventMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBehaviorEvent>>,
+    TError,
+    { data: BodyType<BehaviorEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBehaviorEvent>>,
+  TError,
+  { data: BodyType<BehaviorEventInput> },
+  TContext
+> => {
+  const mutationKey = ["createBehaviorEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBehaviorEvent>>,
+    { data: BodyType<BehaviorEventInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createBehaviorEvent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateBehaviorEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createBehaviorEvent>>
+>;
+export type CreateBehaviorEventMutationBody = BodyType<BehaviorEventInput>;
+export type CreateBehaviorEventMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Record a behavior event
+ */
+export const useCreateBehaviorEvent = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBehaviorEvent>>,
+    TError,
+    { data: BodyType<BehaviorEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createBehaviorEvent>>,
+  TError,
+  { data: BodyType<BehaviorEventInput> },
+  TContext
+> => {
+  return useMutation(getCreateBehaviorEventMutationOptions(options));
+};
+
+/**
+ * @summary Record a meal/fluid intake event
+ */
+export const getCreateIntakeEventUrl = () => {
+  return `/api/intake-events`;
+};
+
+export const createIntakeEvent = async (
+  intakeEventInput: IntakeEventInput,
+  options?: RequestInit,
+): Promise<IntakeEvent> => {
+  return customFetch<IntakeEvent>(getCreateIntakeEventUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(intakeEventInput),
+  });
+};
+
+export const getCreateIntakeEventMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createIntakeEvent>>,
+    TError,
+    { data: BodyType<IntakeEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createIntakeEvent>>,
+  TError,
+  { data: BodyType<IntakeEventInput> },
+  TContext
+> => {
+  const mutationKey = ["createIntakeEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createIntakeEvent>>,
+    { data: BodyType<IntakeEventInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createIntakeEvent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateIntakeEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createIntakeEvent>>
+>;
+export type CreateIntakeEventMutationBody = BodyType<IntakeEventInput>;
+export type CreateIntakeEventMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Record a meal/fluid intake event
+ */
+export const useCreateIntakeEvent = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createIntakeEvent>>,
+    TError,
+    { data: BodyType<IntakeEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createIntakeEvent>>,
+  TError,
+  { data: BodyType<IntakeEventInput> },
+  TContext
+> => {
+  return useMutation(getCreateIntakeEventMutationOptions(options));
+};
+
+/**
+ * @summary Record a fall event
+ */
+export const getCreateFallEventUrl = () => {
+  return `/api/fall-events`;
+};
+
+export const createFallEvent = async (
+  fallEventInput: FallEventInput,
+  options?: RequestInit,
+): Promise<FallEvent> => {
+  return customFetch<FallEvent>(getCreateFallEventUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fallEventInput),
+  });
+};
+
+export const getCreateFallEventMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFallEvent>>,
+    TError,
+    { data: BodyType<FallEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createFallEvent>>,
+  TError,
+  { data: BodyType<FallEventInput> },
+  TContext
+> => {
+  const mutationKey = ["createFallEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createFallEvent>>,
+    { data: BodyType<FallEventInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createFallEvent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateFallEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createFallEvent>>
+>;
+export type CreateFallEventMutationBody = BodyType<FallEventInput>;
+export type CreateFallEventMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Record a fall event
+ */
+export const useCreateFallEvent = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFallEvent>>,
+    TError,
+    { data: BodyType<FallEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createFallEvent>>,
+  TError,
+  { data: BodyType<FallEventInput> },
+  TContext
+> => {
+  return useMutation(getCreateFallEventMutationOptions(options));
+};
+
+/**
+ * @summary Record a vitals event
+ */
+export const getCreateVitalEventUrl = () => {
+  return `/api/vital-events`;
+};
+
+export const createVitalEvent = async (
+  vitalEventInput: VitalEventInput,
+  options?: RequestInit,
+): Promise<VitalEvent> => {
+  return customFetch<VitalEvent>(getCreateVitalEventUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(vitalEventInput),
+  });
+};
+
+export const getCreateVitalEventMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createVitalEvent>>,
+    TError,
+    { data: BodyType<VitalEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createVitalEvent>>,
+  TError,
+  { data: BodyType<VitalEventInput> },
+  TContext
+> => {
+  const mutationKey = ["createVitalEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createVitalEvent>>,
+    { data: BodyType<VitalEventInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createVitalEvent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateVitalEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createVitalEvent>>
+>;
+export type CreateVitalEventMutationBody = BodyType<VitalEventInput>;
+export type CreateVitalEventMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Record a vitals event
+ */
+export const useCreateVitalEvent = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createVitalEvent>>,
+    TError,
+    { data: BodyType<VitalEventInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createVitalEvent>>,
+  TError,
+  { data: BodyType<VitalEventInput> },
+  TContext
+> => {
+  return useMutation(getCreateVitalEventMutationOptions(options));
 };
 
 /**

@@ -8,7 +8,6 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -54,12 +53,14 @@ export const ListBowelMovementsQueryParams = zod.object({
 export const ListBowelMovementsResponseItem = zod.object({
   id: zod.number(),
   residentId: zod.number(),
+  staffId: zod.string().nullish(),
   bristolType: zod.number(),
   amount: zod.string(),
   incontinence: zod.boolean(),
   bloodPresent: zod.boolean(),
   mucusPresent: zod.boolean(),
   painStraining: zod.boolean(),
+  prnGiven: zod.boolean(),
   clinicalNote: zod.string(),
   createdAt: zod.coerce.date(),
 });
@@ -74,17 +75,92 @@ export const createBowelMovementBodyBristolTypeMax = 7;
 
 export const CreateBowelMovementBody = zod.object({
   residentId: zod.number(),
+  staffId: zod.string().optional(),
   bristolType: zod.number().min(1).max(createBowelMovementBodyBristolTypeMax),
   amount: zod.enum(["Small", "Medium", "Large", "XL"]),
   incontinence: zod.boolean(),
   bloodPresent: zod.boolean(),
   mucusPresent: zod.boolean(),
   painStraining: zod.boolean(),
+  prnGiven: zod.boolean().optional(),
   clinicalNote: zod.string(),
-  recordedAt: zod.coerce
-    .date()
-    .optional()
-    .describe("Override the timestamp of the bowel movement (defaults to now)"),
+  recordedAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Record a pain event
+ */
+export const CreatePainEventBody = zod.object({
+  residentId: zod.number(),
+  staffId: zod.string().optional(),
+  severity: zod.enum(["None", "Mild", "Moderate", "Severe"]),
+  location: zod.enum(["Back", "Legs", "Chest", "Head", "Abdomen", "Other"]),
+  prnGiven: zod.boolean().optional(),
+  clinicalNote: zod.string(),
+});
+
+/**
+ * @summary Record a behavior event
+ */
+export const CreateBehaviorEventBody = zod.object({
+  residentId: zod.number(),
+  staffId: zod.string().optional(),
+  type: zod.enum([
+    "Agitation",
+    "Physical",
+    "Verbal",
+    "Wandering",
+    "Refusing Care",
+  ]),
+  intensity: zod.enum(["Low", "High"]),
+  durationMins: zod.number().optional(),
+  clinicalNote: zod.string(),
+});
+
+/**
+ * @summary Record a meal/fluid intake event
+ */
+export const CreateIntakeEventBody = zod.object({
+  residentId: zod.number(),
+  staffId: zod.string().optional(),
+  mealPercent: zod.union([
+    zod.literal(0),
+    zod.literal(25),
+    zod.literal(50),
+    zod.literal(75),
+    zod.literal(100),
+  ]),
+  fluidMl: zod.number(),
+  supplementsGiven: zod.boolean().optional(),
+  clinicalNote: zod.string(),
+});
+
+/**
+ * @summary Record a fall event
+ */
+export const CreateFallEventBody = zod.object({
+  residentId: zod.number(),
+  staffId: zod.string().optional(),
+  isWitnessed: zod.boolean(),
+  apparentInjury: zod.boolean(),
+  neuroVitalsStarted: zod.boolean(),
+  clinicalNote: zod.string(),
+});
+
+/**
+ * @summary Record a vitals event
+ */
+export const CreateVitalEventBody = zod.object({
+  residentId: zod.number(),
+  staffId: zod.string().optional(),
+  temp: zod.number().optional(),
+  bpSys: zod.number().optional(),
+  bpDia: zod.number().optional(),
+  hr: zod.number().optional(),
+  o2: zod.number().optional(),
+  weight: zod.number().optional(),
+  isAbnormalFlag: zod.boolean(),
+  clinicalNote: zod.string(),
 });
 
 /**
@@ -101,6 +177,10 @@ export const GetPhysicianSummaryResponse = zod.object({
       hoursSinceLastBM: zod.number().nullable(),
       monthlyGapCount: zod.number(),
       monthlyBloodCount: zod.number(),
+      hasSeverePain: zod.boolean(),
+      behaviorEventCount24h: zod.number(),
+      hasFall24h: zod.boolean(),
+      hasAbnormalVital24h: zod.boolean(),
     }),
   ),
   facilityMonthlyGaps: zod.number(),

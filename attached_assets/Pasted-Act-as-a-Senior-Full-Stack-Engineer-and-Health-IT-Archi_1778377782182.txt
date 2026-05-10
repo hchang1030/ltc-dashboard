@@ -1,0 +1,35 @@
+Act as a Senior Full-Stack Engineer and Health-IT Architect. We are building the core engine of our 'Long Term Care Dashboard'. 
+
+STAGING GOAL: Move from a single tracker to a Multi-Module Population Health Dashboard.
+
+1. DATABASE SCHEMA (PostgreSQL):
+Expand the database to include these specific tables. Every table MUST include: id, resident_id, staff_id, timestamp, and a 'clinical_note' string.
+
+- residents: (id, name, room_number, is_favorited)
+- bowel_events: (bristol_type [1-7], amount [S/M/L/XL], is_incontinent, has_blood, has_mucus, has_pain, prn_given)
+- pain_events: (severity [None/Mild/Mod/Severe], location [Back/Legs/Chest/Head/Other], prn_given)
+- behavior_events: (type [Agitation/Physical/Verbal/Wandering/Refusing Care], intensity [Low/High], duration_mins)
+- intake_events: (meal_percent [0, 25, 50, 75, 100], fluid_ml, supplements_given)
+- fall_events: (is_witnessed, apparent_injury, neuro_vitals_started)
+- vital_events: (temp, bp_sys, bp_dia, hr, o2, weight, is_abnormal_flag)
+- billing_logs: (billing_code, duration_mins, activity_type [Direct/Indirect])
+
+2. UI ARCHITECTURE (Dual-Mode):
+Implement a 'Hub-and-Spoke' navigation system.
+- Mode A (Resident Focus): Tapping a resident name opens a Modal with a Grid of 6 Icons: [Bowel, Pain, Behavior, Intake, Falls, Vitals].
+- Mode B (Batch Focus): A top-level 'Round' bar. Selecting 'Bowel Round' locks the module and allows the aide to cycle through 'My Patients' one-by-one without leaving the screen.
+
+3. MODULE-SPECIFIC UI DETAILS (Zero-Typing):
+- Pain: 4 large color-coded severity blocks. Tapping one reveals a body-location checklist.
+- Behaviors: Large toggle tiles for BPSD symptoms. Include a slider for 'Intensity'.
+- Intake: A circular percentage picker for meals and '+100ml / +250ml' quick-tap buttons for fluids.
+- Falls: A high-contrast 'EMERGENCY' red theme. Toggles for Witnessed and Injury.
+- Vitals: Large numeric input pads (no small text fields).
+
+4. CLINICAL INTELLIGENCE & ALERTS:
+Update the Physician Census View to display these icons on the resident's card if triggered in the last 24h:
+- 💩 (Brown): No BM for >48h (Amber) or >72h (Red).
+- 💥 (Red): Pain score recorded as 'Severe'.
+- 🧠 (Purple): 2+ Behavior events.
+- ⚠️ (Yellow): Any Fall event.
+- 📉 (Blue): Any Vital flagged as 'Abnormal'.

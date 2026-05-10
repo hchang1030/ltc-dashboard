@@ -6,18 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface BowelMovement {
+export interface FallEvent {
   id: number;
   residentId: number;
   /** @nullable */
   staffId?: string | null;
-  bristolType: number;
-  amount: string;
-  incontinence: boolean;
-  bloodPresent: boolean;
-  mucusPresent: boolean;
-  painStraining: boolean;
-  prnGiven: boolean;
+  isWitnessed: boolean;
+  apparentInjury: boolean;
+  neuroVitalsStarted: boolean;
   clinicalNote: string;
   createdAt: Date;
 }

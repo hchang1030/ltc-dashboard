@@ -6,13 +6,28 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./behaviorEvent";
+export * from "./behaviorEventInput";
+export * from "./behaviorEventInputIntensity";
+export * from "./behaviorEventInputType";
 export * from "./bowelMovement";
 export * from "./bowelMovementInput";
 export * from "./bowelMovementInputAmount";
+export * from "./fallEvent";
+export * from "./fallEventInput";
 export * from "./favoriteToggle";
 export * from "./healthStatus";
+export * from "./intakeEvent";
+export * from "./intakeEventInput";
+export * from "./intakeEventInputMealPercent";
 export * from "./listBowelMovementsParams";
+export * from "./painEvent";
+export * from "./painEventInput";
+export * from "./painEventInputLocation";
+export * from "./painEventInputSeverity";
 export * from "./physicianSummary";
 export * from "./resident";
 export * from "./residentAlertSummary";
 export * from "./residentAlertSummaryAlertLevel";
+export * from "./vitalEvent";
+export * from "./vitalEventInput";

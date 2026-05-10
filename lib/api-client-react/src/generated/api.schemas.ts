@@ -23,12 +23,15 @@ export interface FavoriteToggle {
 export interface BowelMovement {
   id: number;
   residentId: number;
+  /** @nullable */
+  staffId?: string | null;
   bristolType: number;
   amount: string;
   incontinence: boolean;
   bloodPresent: boolean;
   mucusPresent: boolean;
   painStraining: boolean;
+  prnGiven: boolean;
   clinicalNote: string;
   createdAt: string;
 }
@@ -45,6 +48,7 @@ export const BowelMovementInputAmount = {
 
 export interface BowelMovementInput {
   residentId: number;
+  staffId?: string;
   /**
    * @minimum 1
    * @maximum 7
@@ -55,9 +59,181 @@ export interface BowelMovementInput {
   bloodPresent: boolean;
   mucusPresent: boolean;
   painStraining: boolean;
+  prnGiven?: boolean;
   clinicalNote: string;
-  /** Override the timestamp of the bowel movement (defaults to now) */
   recordedAt?: string;
+}
+
+export type PainEventInputSeverity =
+  (typeof PainEventInputSeverity)[keyof typeof PainEventInputSeverity];
+
+export const PainEventInputSeverity = {
+  None: "None",
+  Mild: "Mild",
+  Moderate: "Moderate",
+  Severe: "Severe",
+} as const;
+
+export type PainEventInputLocation =
+  (typeof PainEventInputLocation)[keyof typeof PainEventInputLocation];
+
+export const PainEventInputLocation = {
+  Back: "Back",
+  Legs: "Legs",
+  Chest: "Chest",
+  Head: "Head",
+  Abdomen: "Abdomen",
+  Other: "Other",
+} as const;
+
+export interface PainEventInput {
+  residentId: number;
+  staffId?: string;
+  severity: PainEventInputSeverity;
+  location: PainEventInputLocation;
+  prnGiven?: boolean;
+  clinicalNote: string;
+}
+
+export interface PainEvent {
+  id: number;
+  residentId: number;
+  /** @nullable */
+  staffId?: string | null;
+  severity: string;
+  location: string;
+  prnGiven: boolean;
+  clinicalNote: string;
+  createdAt: string;
+}
+
+export type BehaviorEventInputType =
+  (typeof BehaviorEventInputType)[keyof typeof BehaviorEventInputType];
+
+export const BehaviorEventInputType = {
+  Agitation: "Agitation",
+  Physical: "Physical",
+  Verbal: "Verbal",
+  Wandering: "Wandering",
+  Refusing_Care: "Refusing Care",
+} as const;
+
+export type BehaviorEventInputIntensity =
+  (typeof BehaviorEventInputIntensity)[keyof typeof BehaviorEventInputIntensity];
+
+export const BehaviorEventInputIntensity = {
+  Low: "Low",
+  High: "High",
+} as const;
+
+export interface BehaviorEventInput {
+  residentId: number;
+  staffId?: string;
+  type: BehaviorEventInputType;
+  intensity: BehaviorEventInputIntensity;
+  durationMins?: number;
+  clinicalNote: string;
+}
+
+export interface BehaviorEvent {
+  id: number;
+  residentId: number;
+  /** @nullable */
+  staffId?: string | null;
+  type: string;
+  intensity: string;
+  /** @nullable */
+  durationMins?: number | null;
+  clinicalNote: string;
+  createdAt: string;
+}
+
+export type IntakeEventInputMealPercent =
+  (typeof IntakeEventInputMealPercent)[keyof typeof IntakeEventInputMealPercent];
+
+export const IntakeEventInputMealPercent = {
+  NUMBER_0: 0,
+  NUMBER_25: 25,
+  NUMBER_50: 50,
+  NUMBER_75: 75,
+  NUMBER_100: 100,
+} as const;
+
+export interface IntakeEventInput {
+  residentId: number;
+  staffId?: string;
+  mealPercent: IntakeEventInputMealPercent;
+  fluidMl: number;
+  supplementsGiven?: boolean;
+  clinicalNote: string;
+}
+
+export interface IntakeEvent {
+  id: number;
+  residentId: number;
+  /** @nullable */
+  staffId?: string | null;
+  mealPercent: number;
+  fluidMl: number;
+  supplementsGiven: boolean;
+  clinicalNote: string;
+  createdAt: string;
+}
+
+export interface FallEventInput {
+  residentId: number;
+  staffId?: string;
+  isWitnessed: boolean;
+  apparentInjury: boolean;
+  neuroVitalsStarted: boolean;
+  clinicalNote: string;
+}
+
+export interface FallEvent {
+  id: number;
+  residentId: number;
+  /** @nullable */
+  staffId?: string | null;
+  isWitnessed: boolean;
+  apparentInjury: boolean;
+  neuroVitalsStarted: boolean;
+  clinicalNote: string;
+  createdAt: string;
+}
+
+export interface VitalEventInput {
+  residentId: number;
+  staffId?: string;
+  temp?: number;
+  bpSys?: number;
+  bpDia?: number;
+  hr?: number;
+  o2?: number;
+  weight?: number;
+  isAbnormalFlag: boolean;
+  clinicalNote: string;
+}
+
+export interface VitalEvent {
+  id: number;
+  residentId: number;
+  /** @nullable */
+  staffId?: string | null;
+  /** @nullable */
+  temp?: number | null;
+  /** @nullable */
+  bpSys?: number | null;
+  /** @nullable */
+  bpDia?: number | null;
+  /** @nullable */
+  hr?: number | null;
+  /** @nullable */
+  o2?: number | null;
+  /** @nullable */
+  weight?: number | null;
+  isAbnormalFlag: boolean;
+  clinicalNote: string;
+  createdAt: string;
 }
 
 export type ResidentAlertSummaryAlertLevel =
@@ -80,6 +256,10 @@ export interface ResidentAlertSummary {
   hoursSinceLastBM: number | null;
   monthlyGapCount: number;
   monthlyBloodCount: number;
+  hasSeverePain: boolean;
+  behaviorEventCount24h: number;
+  hasFall24h: boolean;
+  hasAbnormalVital24h: boolean;
 }
 
 export interface PhysicianSummary {

@@ -9,6 +9,7 @@ import type { BowelMovementInputAmount } from "./bowelMovementInputAmount";
 
 export interface BowelMovementInput {
   residentId: number;
+  staffId?: string;
   /**
    * @minimum 1
    * @maximum 7
@@ -19,7 +20,7 @@ export interface BowelMovementInput {
   bloodPresent: boolean;
   mucusPresent: boolean;
   painStraining: boolean;
+  prnGiven?: boolean;
   clinicalNote: string;
-  /** Override the timestamp of the bowel movement (defaults to now) */
   recordedAt?: Date;
 }

@@ -1,6 +1,5 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
   description: API specification
@@ -9,20 +8,21 @@ servers:
     description: Base API path
 tags:
   - name: health
-    description: Health operations
-  - name: bowelMovements
-    description: Bowel movement tracking
-  - name: physician
-    description: Physician dashboard
   - name: residents
-    description: Resident management
+  - name: bowelMovements
+  - name: painEvents
+  - name: behaviorEvents
+  - name: intakeEvents
+  - name: fallEvents
+  - name: vitalEvents
+  - name: physician
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -70,8 +70,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Resident"
-        "404":
-          description: Resident not found
 
   /bowel-movements:
     get:
@@ -110,8 +108,101 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BowelMovement"
-        "400":
-          description: Validation error
+
+  /pain-events:
+    post:
+      operationId: createPainEvent
+      tags: [painEvents]
+      summary: Record a pain event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PainEventInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PainEvent"
+
+  /behavior-events:
+    post:
+      operationId: createBehaviorEvent
+      tags: [behaviorEvents]
+      summary: Record a behavior event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BehaviorEventInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BehaviorEvent"
+
+  /intake-events:
+    post:
+      operationId: createIntakeEvent
+      tags: [intakeEvents]
+      summary: Record a meal/fluid intake event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeEventInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeEvent"
+
+  /fall-events:
+    post:
+      operationId: createFallEvent
+      tags: [fallEvents]
+      summary: Record a fall event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FallEventInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FallEvent"
+
+  /vital-events:
+    post:
+      operationId: createVitalEvent
+      tags: [vitalEvents]
+      summary: Record a vitals event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VitalEventInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VitalEvent"
 
   /physician/summary:
     get:
@@ -120,7 +211,7 @@ paths:
       summary: Get physician population health summary
       responses:
         "200":
-          description: Physician summary with per-resident alert status and monthly stats
+          description: Physician summary with per-resident alert status
           content:
             application/json:
               schema:
@@ -130,11 +221,10 @@ components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
     Resident:
       type: object
@@ -158,22 +248,14 @@ components:
 
     BowelMovement:
       type: object
-      required:
-        - id
-        - residentId
-        - bristolType
-        - amount
-        - incontinence
-        - bloodPresent
-        - mucusPresent
-        - painStraining
-        - clinicalNote
-        - createdAt
+      required: [id, residentId, bristolType, amount, incontinence, bloodPresent, mucusPresent, painStraining, prnGiven, clinicalNote, createdAt]
       properties:
         id:
           type: integer
         residentId:
           type: integer
+        staffId:
+          type: ["string", "null"]
         bristolType:
           type: integer
         amount:
@@ -186,6 +268,8 @@ components:
           type: boolean
         painStraining:
           type: boolean
+        prnGiven:
+          type: boolean
         clinicalNote:
           type: string
         createdAt:
@@ -194,18 +278,12 @@ components:
 
     BowelMovementInput:
       type: object
-      required:
-        - residentId
-        - bristolType
-        - amount
-        - incontinence
-        - bloodPresent
-        - mucusPresent
-        - painStraining
-        - clinicalNote
+      required: [residentId, bristolType, amount, incontinence, bloodPresent, mucusPresent, painStraining, clinicalNote]
       properties:
         residentId:
           type: integer
+        staffId:
+          type: string
         bristolType:
           type: integer
           minimum: 1
@@ -221,24 +299,233 @@ components:
           type: boolean
         painStraining:
           type: boolean
+        prnGiven:
+          type: boolean
         clinicalNote:
           type: string
         recordedAt:
           type: string
           format: date-time
-          description: Override the timestamp of the bowel movement (defaults to now)
+
+    PainEventInput:
+      type: object
+      required: [residentId, severity, location, clinicalNote]
+      properties:
+        residentId:
+          type: integer
+        staffId:
+          type: string
+        severity:
+          type: string
+          enum: [None, Mild, Moderate, Severe]
+        location:
+          type: string
+          enum: [Back, Legs, Chest, Head, Abdomen, Other]
+        prnGiven:
+          type: boolean
+        clinicalNote:
+          type: string
+
+    PainEvent:
+      type: object
+      required: [id, residentId, severity, location, prnGiven, clinicalNote, createdAt]
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        staffId:
+          type: ["string", "null"]
+        severity:
+          type: string
+        location:
+          type: string
+        prnGiven:
+          type: boolean
+        clinicalNote:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    BehaviorEventInput:
+      type: object
+      required: [residentId, type, intensity, clinicalNote]
+      properties:
+        residentId:
+          type: integer
+        staffId:
+          type: string
+        type:
+          type: string
+          enum: [Agitation, Physical, Verbal, Wandering, Refusing Care]
+        intensity:
+          type: string
+          enum: [Low, High]
+        durationMins:
+          type: integer
+        clinicalNote:
+          type: string
+
+    BehaviorEvent:
+      type: object
+      required: [id, residentId, type, intensity, clinicalNote, createdAt]
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        staffId:
+          type: ["string", "null"]
+        type:
+          type: string
+        intensity:
+          type: string
+        durationMins:
+          type: ["integer", "null"]
+        clinicalNote:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    IntakeEventInput:
+      type: object
+      required: [residentId, mealPercent, fluidMl, clinicalNote]
+      properties:
+        residentId:
+          type: integer
+        staffId:
+          type: string
+        mealPercent:
+          type: integer
+          enum: [0, 25, 50, 75, 100]
+        fluidMl:
+          type: integer
+        supplementsGiven:
+          type: boolean
+        clinicalNote:
+          type: string
+
+    IntakeEvent:
+      type: object
+      required: [id, residentId, mealPercent, fluidMl, supplementsGiven, clinicalNote, createdAt]
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        staffId:
+          type: ["string", "null"]
+        mealPercent:
+          type: integer
+        fluidMl:
+          type: integer
+        supplementsGiven:
+          type: boolean
+        clinicalNote:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    FallEventInput:
+      type: object
+      required: [residentId, isWitnessed, apparentInjury, neuroVitalsStarted, clinicalNote]
+      properties:
+        residentId:
+          type: integer
+        staffId:
+          type: string
+        isWitnessed:
+          type: boolean
+        apparentInjury:
+          type: boolean
+        neuroVitalsStarted:
+          type: boolean
+        clinicalNote:
+          type: string
+
+    FallEvent:
+      type: object
+      required: [id, residentId, isWitnessed, apparentInjury, neuroVitalsStarted, clinicalNote, createdAt]
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        staffId:
+          type: ["string", "null"]
+        isWitnessed:
+          type: boolean
+        apparentInjury:
+          type: boolean
+        neuroVitalsStarted:
+          type: boolean
+        clinicalNote:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    VitalEventInput:
+      type: object
+      required: [residentId, isAbnormalFlag, clinicalNote]
+      properties:
+        residentId:
+          type: integer
+        staffId:
+          type: string
+        temp:
+          type: number
+        bpSys:
+          type: integer
+        bpDia:
+          type: integer
+        hr:
+          type: integer
+        o2:
+          type: number
+        weight:
+          type: number
+        isAbnormalFlag:
+          type: boolean
+        clinicalNote:
+          type: string
+
+    VitalEvent:
+      type: object
+      required: [id, residentId, isAbnormalFlag, clinicalNote, createdAt]
+      properties:
+        id:
+          type: integer
+        residentId:
+          type: integer
+        staffId:
+          type: ["string", "null"]
+        temp:
+          type: ["number", "null"]
+        bpSys:
+          type: ["integer", "null"]
+        bpDia:
+          type: ["integer", "null"]
+        hr:
+          type: ["integer", "null"]
+        o2:
+          type: ["number", "null"]
+        weight:
+          type: ["number", "null"]
+        isAbnormalFlag:
+          type: boolean
+        clinicalNote:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
 
     ResidentAlertSummary:
       type: object
-      required:
-        - residentId
-        - name
-        - room
-        - alertLevel
-        - lastBMAt
-        - hoursSinceLastBM
-        - monthlyGapCount
-        - monthlyBloodCount
+      required: [residentId, name, room, alertLevel, lastBMAt, hoursSinceLastBM, monthlyGapCount, monthlyBloodCount, hasSeverePain, behaviorEventCount24h, hasFall24h, hasAbnormalVital24h]
       properties:
         residentId:
           type: integer
@@ -258,14 +545,18 @@ components:
           type: integer
         monthlyBloodCount:
           type: integer
+        hasSeverePain:
+          type: boolean
+        behaviorEventCount24h:
+          type: integer
+        hasFall24h:
+          type: boolean
+        hasAbnormalVital24h:
+          type: boolean
 
     PhysicianSummary:
       type: object
-      required:
-        - residents
-        - facilityMonthlyGaps
-        - facilityMonthlyBlood
-        - generatedAt
+      required: [residents, facilityMonthlyGaps, facilityMonthlyBlood, generatedAt]
       properties:
         residents:
           type: array

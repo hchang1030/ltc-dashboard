@@ -5,15 +5,15 @@ import { residentsTable } from "./residents";
 
 export const bowelMovementsTable = pgTable("bowel_movements", {
   id: serial("id").primaryKey(),
-  residentId: integer("resident_id")
-    .notNull()
-    .references(() => residentsTable.id),
+  residentId: integer("resident_id").notNull().references(() => residentsTable.id),
+  staffId: text("staff_id"),
   bristolType: integer("bristol_type").notNull(),
   amount: text("amount").notNull(),
   incontinence: boolean("incontinence").notNull().default(false),
   bloodPresent: boolean("blood_present").notNull().default(false),
   mucusPresent: boolean("mucus_present").notNull().default(false),
   painStraining: boolean("pain_straining").notNull().default(false),
+  prnGiven: boolean("prn_given").notNull().default(false),
   clinicalNote: text("clinical_note").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
