@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, createContext, useContext } from "react";
+import type { ReactNode } from "react";
 import {
   Clock, Star, ChevronRight, ArrowLeft, Search, X,
   Droplets, Zap, Brain, Utensils, AlertOctagon, Activity, Megaphone,
   FileText, MessageCircle, Send, BookOpen,
+  Clipboard, Trash2, Pencil, Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PatientOverlay } from "@/components/PatientOverlay";
@@ -38,6 +40,47 @@ type StoolType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | null;
 type Amount = "Small" | "Medium" | "Large" | "XL" | null;
 type ViewFilter = "all" | "favorites";
 interface BowelFlags { incontinence: boolean; blood: boolean; mucus: boolean; pain: boolean; }
+
+// ── Notes Queue ───────────────────────────────────────────────────────────────
+
+interface NoteItem {
+  id: string;
+  patientName: string;
+  roomNumber: string;
+  content: string;
+  timestamp: Date;
+}
+
+interface NotesQueueContextValue {
+  notesQueue: NoteItem[];
+  addNote: (n: Omit<NoteItem, "id" | "timestamp">) => void;
+  removeNote: (id: string) => void;
+  editNote: (id: string, content: string) => void;
+}
+
+const NotesQueueContext = createContext<NotesQueueContextValue>({
+  notesQueue: [], addNote: () => {}, removeNote: () => {}, editNote: () => {},
+});
+
+function useNotesQueue() { return useContext(NotesQueueContext); }
+
+function NotesQueueProvider({ children }: { children: ReactNode }) {
+  const [notesQueue, setNotesQueue] = useState<NoteItem[]>([]);
+  const addNote = useCallback((n: Omit<NoteItem, "id" | "timestamp">) => {
+    setNotesQueue((prev) => [{ ...n, id: crypto.randomUUID(), timestamp: new Date() }, ...prev]);
+  }, []);
+  const removeNote = useCallback((id: string) => {
+    setNotesQueue((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+  const editNote = useCallback((id: string, content: string) => {
+    setNotesQueue((prev) => prev.map((n) => n.id === id ? { ...n, content } : n));
+  }, []);
+  return (
+    <NotesQueueContext.Provider value={{ notesQueue, addNote, removeNote, editNote }}>
+      {children}
+    </NotesQueueContext.Provider>
+  );
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -227,6 +270,8 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
   const [time, setTime] = useState(new Date());
   const [showBinder, setShowBinder] = useState(false);
   const [showCommHub, setShowCommHub] = useState(false);
+  const [showNotesQueue, setShowNotesQueue] = useState(false);
+  const { notesQueue } = useNotesQueue();
 
   const queryClient = useQueryClient();
   const { data: residents = [], isLoading } = useListResidents();
@@ -306,32 +351,44 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
         </div>
       )}
 
+      {showNotesQueue && (
+        <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
+          <NotesQueueView onClose={() => setShowNotesQueue(false)} />
+        </div>
+      )}
+
       <div className="sticky top-[61px] z-20 bg-background border-b border-border px-6 py-3 space-y-3 shrink-0">
         <div className="flex gap-2">
-          <button onClick={() => { setFilter("all"); setShowBinder(false); setShowCommHub(false); }}
+          <button onClick={() => { setFilter("all"); setShowBinder(false); setShowCommHub(false); setShowNotesQueue(false); }}
             className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all",
-              !showBinder && !showCommHub && filter === "all" ? "bg-primary border-primary text-primary-foreground shadow-md" : "bg-card border-border text-muted-foreground hover:border-primary/40"].join(" ")}>
+              !showBinder && !showCommHub && !showNotesQueue && filter === "all" ? "bg-primary border-primary text-primary-foreground shadow-md" : "bg-card border-border text-muted-foreground hover:border-primary/40"].join(" ")}>
             All Residents ({residents.length})
           </button>
-          <button onClick={() => { setFilter("favorites"); setShowBinder(false); setShowCommHub(false); }}
+          <button onClick={() => { setFilter("favorites"); setShowBinder(false); setShowCommHub(false); setShowNotesQueue(false); }}
             className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
-              !showBinder && !showCommHub && filter === "favorites" ? "bg-amber-500 border-amber-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-amber-500/40"].join(" ")}>
-            <Star className={[!showBinder && !showCommHub && filter === "favorites" ? "fill-white" : "", "w-4 h-4"].join(" ")} />
+              !showBinder && !showCommHub && !showNotesQueue && filter === "favorites" ? "bg-amber-500 border-amber-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-amber-500/40"].join(" ")}>
+            <Star className={[!showBinder && !showCommHub && !showNotesQueue && filter === "favorites" ? "fill-white" : "", "w-4 h-4"].join(" ")} />
             My Patients ({favCount})
           </button>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => { setShowBinder(true); setShowCommHub(false); }}
+          <button onClick={() => { setShowBinder(true); setShowCommHub(false); setShowNotesQueue(false); }}
             className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
               showBinder ? "bg-sky-600 border-sky-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-sky-500/40"].join(" ")}>
             <MessageCircle className="w-4 h-4" />
             Family Binder
           </button>
-          <button onClick={() => { setShowBinder(false); setShowCommHub(true); }}
+          <button onClick={() => { setShowBinder(false); setShowCommHub(true); setShowNotesQueue(false); }}
             className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
               showCommHub ? "bg-violet-600 border-violet-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-violet-500/40"].join(" ")}>
             <Send className="w-4 h-4" />
             Comm Hub
+          </button>
+          <button onClick={() => { setShowBinder(false); setShowCommHub(false); setShowNotesQueue(true); }}
+            className={["flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-wider border-2 transition-all flex items-center justify-center gap-2",
+              showNotesQueue ? "bg-emerald-700 border-emerald-500 text-white shadow-md" : "bg-card border-border text-muted-foreground hover:border-emerald-500/40"].join(" ")}>
+            <FileText className="w-4 h-4" />
+            Notes Queue{notesQueue.length > 0 ? ` (${notesQueue.length})` : ""}
           </button>
         </div>
         <div className="relative">
@@ -371,6 +428,162 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
             </li>
           ))}
         </ul>
+      </div>
+    </div>
+  );
+}
+
+// ── ── ── Notes Queue View ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+
+function NotesQueueView({ onClose }: { onClose: () => void }) {
+  const { notesQueue, removeNote, editNote } = useNotesQueue();
+  const { toast } = useToast();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
+  const prevLength = useRef(0);
+
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = "@keyframes slideInNote { from { opacity:0; transform:translateY(-14px); } to { opacity:1; transform:translateY(0); } }";
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
+
+  useEffect(() => {
+    if (notesQueue.length > prevLength.current && notesQueue[0]) {
+      const id = notesQueue[0].id;
+      setAnimatingIds((prev) => new Set([...prev, id]));
+      setTimeout(() => setAnimatingIds((prev) => { const n = new Set(prev); n.delete(id); return n; }), 500);
+    }
+    prevLength.current = notesQueue.length;
+  }, [notesQueue]);
+
+  const handleCopy = async (content: string) => {
+    try { await navigator.clipboard.writeText(content); toast({ title: "Copied to clipboard" }); }
+    catch { toast({ title: "Copy failed", variant: "destructive" }); }
+  };
+
+  const startEdit = (id: string, content: string) => { setEditingId(id); setEditText(content); setDeletingId(null); };
+  const saveEdit = (id: string) => { if (editText.trim()) editNote(id, editText.trim()); setEditingId(null); };
+  const handleDelete = (id: string) => {
+    if (deletingId === id) { removeNote(id); setDeletingId(null); toast({ title: "Note removed from queue" }); }
+    else { setDeletingId(id); }
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <header className="sticky top-0 z-30 bg-card border-b border-border px-6 py-4 shadow-md shrink-0">
+        <div className="flex items-center gap-4">
+          <button onClick={onClose}
+            className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors shrink-0">
+            <ArrowLeft className="w-4 h-4" /> Back
+          </button>
+          <div className="flex-1 flex items-center gap-3">
+            <span className="font-bold text-base text-foreground">📋 Notes Queue</span>
+            <span className="text-xs text-muted-foreground">Drafts for Review</span>
+          </div>
+          {notesQueue.length > 0 && (
+            <span className="bg-primary/15 border border-primary/30 text-primary px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0">
+              {notesQueue.length} {notesQueue.length === 1 ? "draft" : "drafts"}
+            </span>
+          )}
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto">
+        {notesQueue.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-4 text-center px-6">
+            <div className="bg-muted/40 p-6 rounded-full">
+              <FileText className="w-10 h-10 text-muted-foreground/30" />
+            </div>
+            <p className="font-semibold text-muted-foreground text-lg">Queue is empty</p>
+            <p className="text-muted-foreground/60 text-sm max-w-xs leading-relaxed">
+              Notes are added automatically when you save a clinical event — bowel, pain, behavior, intake, falls, or vitals.
+            </p>
+          </div>
+        ) : (
+          <ul className="max-w-3xl mx-auto w-full p-6 space-y-4">
+            {notesQueue.map((note) => (
+              <li
+                key={note.id}
+                className="rounded-2xl border border-border bg-card overflow-hidden"
+                style={animatingIds.has(note.id) ? { animation: "slideInNote 0.4s ease-out" } : undefined}
+              >
+                {/* Card header */}
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/50 bg-muted/20">
+                  <div>
+                    <p className="font-bold text-foreground text-sm">{note.patientName}</p>
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">Room {note.roomNumber}</p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground/60 font-mono shrink-0">
+                    {note.timestamp.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })}
+                    {" · "}
+                    {note.timestamp.toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
+                  </p>
+                </div>
+
+                {/* Card body */}
+                <div className="px-5 py-4">
+                  {editingId === note.id ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        rows={6}
+                        autoFocus
+                        className="w-full bg-background border-2 border-primary/40 rounded-xl px-4 py-3 text-sm font-mono text-foreground focus:outline-none focus:border-primary resize-none leading-relaxed"
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => saveEdit(note.id)}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary/20 border border-primary/40 text-primary font-bold text-sm hover:bg-primary/30 transition-colors">
+                          <Check className="w-3.5 h-3.5" /> Save
+                        </button>
+                        <button onClick={() => setEditingId(null)}
+                          className="px-4 py-2 rounded-lg border border-border text-muted-foreground font-semibold text-sm hover:bg-muted transition-colors">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="font-mono text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                {editingId !== note.id && (
+                  <div className="flex items-center gap-2 px-5 pb-4 flex-wrap">
+                    <button onClick={() => startEdit(note.id, note.content)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted font-semibold text-sm transition-colors">
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </button>
+                    <button onClick={() => handleCopy(note.content)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted font-semibold text-sm transition-colors">
+                      <Clipboard className="w-3.5 h-3.5" /> Copy
+                    </button>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      {deletingId === note.id && (
+                        <button onClick={() => setDeletingId(null)}
+                          className="px-3.5 py-2 rounded-lg border border-border text-muted-foreground hover:bg-muted text-sm font-semibold transition-colors">
+                          Cancel
+                        </button>
+                      )}
+                      <button onClick={() => handleDelete(note.id)}
+                        className={["flex items-center gap-1.5 px-3.5 py-2 rounded-lg border font-semibold text-sm transition-all",
+                          deletingId === note.id
+                            ? "bg-red-600 border-red-500 text-white shadow-lg"
+                            : "border-border bg-card text-muted-foreground hover:text-red-400 hover:border-red-500/40"].join(" ")}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {deletingId === note.id ? "Confirm Delete" : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -657,6 +870,7 @@ function BowelForm({ resident, onBack }: { resident: Resident; onBack: () => voi
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createBM = useCreateBowelMovement();
+  const { addNote } = useNotesQueue();
 
   const note = useMemo(() => {
     if (!stoolType && !amount && !Object.values(flags).some(Boolean)) return "Awaiting documentation input...";
@@ -698,6 +912,7 @@ function BowelForm({ resident, onBack }: { resident: Resident; onBack: () => voi
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
+        addNote({ patientName: resident.name, roomNumber: resident.room, content: note });
         toast({ title: "Saved & copied", description: "BM recorded. Note copied to clipboard." });
         handleReset(); onBack();
       },
@@ -797,6 +1012,7 @@ function PainForm({ resident, onBack }: { resident: Resident; onBack: () => void
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createPain = useCreatePainEvent();
+  const { addNote: addNotePain } = useNotesQueue();
 
   const note = useMemo(() => {
     if (!severity) return "Awaiting documentation input...";
@@ -823,6 +1039,7 @@ function PainForm({ resident, onBack }: { resident: Resident; onBack: () => void
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
+        addNotePain({ patientName: resident.name, roomNumber: resident.room, content: note });
         toast({ title: "Saved & copied", description: "Pain event recorded." });
         handleReset(); onBack();
       },
@@ -906,6 +1123,7 @@ function BehaviorForm({ resident, onBack }: { resident: Resident; onBack: () => 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createBehavior = useCreateBehaviorEvent();
+  const { addNote: addNoteBehavior } = useNotesQueue();
 
   const note = useMemo(() => {
     if (!type) return "Awaiting documentation input...";
@@ -931,6 +1149,7 @@ function BehaviorForm({ resident, onBack }: { resident: Resident; onBack: () => 
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
+        addNoteBehavior({ patientName: resident.name, roomNumber: resident.room, content: note });
         toast({ title: "Saved & copied", description: "Behavior event recorded." });
         handleReset(); onBack();
       },
@@ -1027,6 +1246,7 @@ function IntakeForm({ resident, onBack }: { resident: Resident; onBack: () => vo
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createIntake = useCreateIntakeEvent();
+  const { addNote: addNoteIntake } = useNotesQueue();
 
   const note = useMemo(() => {
     if (mealPercent === null && fluidMl === 0) return "Awaiting documentation input...";
@@ -1054,6 +1274,7 @@ function IntakeForm({ resident, onBack }: { resident: Resident; onBack: () => vo
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
+        addNoteIntake({ patientName: resident.name, roomNumber: resident.room, content: note });
         toast({ title: "Saved & copied", description: "Intake event recorded." });
         handleReset(); onBack();
       },
@@ -1166,6 +1387,7 @@ function FallsForm({ resident, onBack }: { resident: Resident; onBack: () => voi
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createFall = useCreateFallEvent();
+  const { addNote: addNoteFall } = useNotesQueue();
 
   const note = useMemo(() => {
     const witnessStr = witnessed !== null ? (witnessed ? "Witnessed" : "Unwitnessed") : "Witness status pending";
@@ -1191,6 +1413,7 @@ function FallsForm({ resident, onBack }: { resident: Resident; onBack: () => voi
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
+        addNoteFall({ patientName: resident.name, roomNumber: resident.room, content: note });
         toast({ title: "Saved & copied", description: "Fall event recorded." });
         handleReset(); onBack();
       },
@@ -1264,6 +1487,7 @@ function VitalsForm({ resident, onBack }: { resident: Resident; onBack: () => vo
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createVital = useCreateVitalEvent();
+  const { addNote: addNoteVital } = useNotesQueue();
 
   const n = (v: string) => v === "" ? null : parseFloat(v);
   const ni = (v: string) => v === "" ? null : parseInt(v, 10);
@@ -1306,6 +1530,7 @@ function VitalsForm({ resident, onBack }: { resident: Resident; onBack: () => vo
       onSuccess: async () => {
         try { await navigator.clipboard.writeText(note); } catch { /* blocked */ }
         queryClient.invalidateQueries({ queryKey: getGetPhysicianSummaryQueryKey() });
+        addNoteVital({ patientName: resident.name, roomNumber: resident.room, content: note });
         toast({ title: "Saved & copied", description: "Vitals recorded." });
         handleReset(); onBack();
       },
@@ -1437,7 +1662,7 @@ function MessageForm({ resident, onBack }: { resident: Resident; onBack: () => v
 
 // ── Root Export ───────────────────────────────────────────────────────────────
 
-export default function BowelMovementLog() {
+function BowelMovementLogInner() {
   const [view, setView] = useState<ViewState>("list");
   const [resident, setResident] = useState<Resident | null>(null);
 
@@ -1456,4 +1681,12 @@ export default function BowelMovementLog() {
   if (view === "vitals")   return <VitalsForm resident={resident} onBack={goToHub} />;
   if (view === "message")  return <MessageForm resident={resident} onBack={goToHub} />;
   return null;
+}
+
+export default function BowelMovementLog() {
+  return (
+    <NotesQueueProvider>
+      <BowelMovementLogInner />
+    </NotesQueueProvider>
+  );
 }
