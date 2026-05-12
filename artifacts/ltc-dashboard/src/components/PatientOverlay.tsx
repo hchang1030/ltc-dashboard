@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   X, ChevronLeft, Syringe, Pill, ClipboardList, Activity,
   AlertTriangle, AlertCircle, Shield, Phone, UserCheck,
-  FileText, Copy, Check, Printer, Mic,
+  FileText, Copy, Check, Printer, Mic, Upload, Loader2, Sparkles,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -554,12 +554,159 @@ function BowelTrackerSection({ residentId }: { residentId: number }) {
   );
 }
 
+// ── Intelligent Document Intake ───────────────────────────────────────────────
+
+interface ExtractedItem  { text: string; accepted: boolean; }
+interface DocIntakeResult { allergies: string[]; pmhx: string[]; followUps: string[]; }
+
+const MOCK_DISCHARGE: { allergies: ExtractedItem[]; pmhx: ExtractedItem[]; followUps: ExtractedItem[] } = {
+  allergies: [
+    { text: "Sulfa Drugs — rash and urticaria",               accepted: true  },
+    { text: "Codeine — GI intolerance and excessive sedation", accepted: true  },
+  ],
+  pmhx: [
+    { text: "Atrial Fibrillation — newly diagnosed (May 2026)",            accepted: true  },
+    { text: "Type 2 Diabetes Mellitus — revised to insulin-dependent",     accepted: true  },
+    { text: "Mild Cognitive Impairment — progressive (MMSE 21/30)",        accepted: false },
+  ],
+  followUps: [
+    { text: "Repeat echocardiogram in 3 months",                accepted: true  },
+    { text: "Geriatric Psychiatry follow-up — June 15, 2026",  accepted: true  },
+    { text: "Cardiology referral for rate control review",      accepted: true  },
+    { text: "Repeat HbA1c in 6 weeks",                         accepted: false },
+    { text: "Neurology referral for MCI workup",               accepted: false },
+  ],
+};
+
+function DocIntakeModal({ residentName, onApprove, onClose }: {
+  residentName: string;
+  onApprove: (result: DocIntakeResult) => void;
+  onClose: () => void;
+}) {
+  const [items, setItems] = useState(() => ({
+    allergies: MOCK_DISCHARGE.allergies.map(i => ({ ...i })),
+    pmhx:      MOCK_DISCHARGE.pmhx.map(i => ({ ...i })),
+    followUps: MOCK_DISCHARGE.followUps.map(i => ({ ...i })),
+  }));
+
+  type Sec = "allergies" | "pmhx" | "followUps";
+  const toggle = (sec: Sec, idx: number) =>
+    setItems(p => ({ ...p, [sec]: p[sec].map((x, i) => i === idx ? { ...x, accepted: !x.accepted } : x) }));
+
+  const handleApprove = () => onApprove({
+    allergies: items.allergies.filter(x => x.accepted).map(x => x.text),
+    pmhx:      items.pmhx.filter(x => x.accepted).map(x => x.text),
+    followUps: items.followUps.filter(x => x.accepted).map(x => x.text),
+  });
+
+  const Row = ({ accepted, onToggle, text, activeCls }: {
+    accepted: boolean; onToggle: () => void; text: string; activeCls: string;
+  }) => (
+    <button onClick={onToggle} className="w-full flex items-start gap-3 text-left group">
+      <div className={["mt-0.5 w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-all", accepted ? activeCls : "border-border/60 group-hover:border-border"].join(" ")}>
+        {accepted && <Check className="w-2.5 h-2.5 text-white" />}
+      </div>
+      <p className={["text-sm leading-relaxed select-none pt-0.5", accepted ? "text-foreground" : "text-muted-foreground/50 line-through"].join(" ")}>{text}</p>
+    </button>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[180] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0 bg-amber-950/20">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-foreground">Review Extracted Data</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">{residentName} — parsed from Discharge Summary</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-5 h-5" /></button>
+        </div>
+
+        {/* Subheader hint */}
+        <div className="px-6 py-2.5 border-b border-border/50 bg-muted/10">
+          <p className="text-xs text-muted-foreground/70">Click any item to toggle acceptance. Unchecked items will not be applied to the chart.</p>
+        </div>
+
+        {/* Sections */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+
+          {/* A — Allergies */}
+          <div className="rounded-xl border border-red-500/30 bg-red-950/20 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-red-500/20 bg-red-950/30">
+              <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+              <p className="text-xs font-bold uppercase tracking-widest text-red-300">A — Allergies &amp; Adverse Reactions</p>
+            </div>
+            <div className="px-4 py-3 space-y-2.5">
+              {items.allergies.map((item, i) => (
+                <Row key={i} accepted={item.accepted} onToggle={() => toggle("allergies", i)} text={item.text}
+                  activeCls="bg-red-500 border-red-400" />
+              ))}
+            </div>
+          </div>
+
+          {/* B — PMHx */}
+          <div className="rounded-xl border border-blue-500/30 bg-blue-950/20 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-blue-500/20 bg-blue-950/30">
+              <ClipboardList className="w-3.5 h-3.5 text-blue-400" />
+              <p className="text-xs font-bold uppercase tracking-widest text-blue-300">B — Past Medical History</p>
+            </div>
+            <div className="px-4 py-3 space-y-2.5">
+              {items.pmhx.map((item, i) => (
+                <Row key={i} accepted={item.accepted} onToggle={() => toggle("pmhx", i)} text={item.text}
+                  activeCls="bg-blue-500 border-blue-400" />
+              ))}
+            </div>
+          </div>
+
+          {/* C — Follow-Ups */}
+          <div className="rounded-xl border border-violet-500/30 bg-violet-950/20 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-violet-500/20 bg-violet-950/30">
+              <FileText className="w-3.5 h-3.5 text-violet-400" />
+              <p className="text-xs font-bold uppercase tracking-widest text-violet-300">C — Follow-Up Tasks</p>
+            </div>
+            <div className="px-4 py-3 space-y-2.5">
+              {items.followUps.map((item, i) => (
+                <Row key={i} accepted={item.accepted} onToggle={() => toggle("followUps", i)} text={item.text}
+                  activeCls="bg-violet-500 border-violet-400" />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-border shrink-0 flex gap-3">
+          <button onClick={handleApprove}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
+            <Check className="w-4 h-4" />
+            Approve &amp; Update Chart
+          </button>
+          <button onClick={onClose}
+            className="px-6 py-3.5 rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors text-sm font-medium shrink-0">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Patient Overlay ───────────────────────────────────────────────────────────
 export function PatientOverlay({ resident, onClose, inline = false }: { resident: OverlayResident | null; onClose: () => void; inline?: boolean }) {
   const isOpen = resident !== null;
   const [showLabsDrawer, setShowLabsDrawer] = useState(false);
   const [vitalModal, setVitalModal] = useState<VitalKey | null>(null);
   const [showTransfer, setShowTransfer] = useState(false);
+  const [docIntakeState, setDocIntakeState] = useState<"idle" | "processing" | "reviewing">("idle");
+  const [injectedAllergies, setInjectedAllergies] = useState<string[]>([]);
+  const [intakeFollowUps, setIntakeFollowUps] = useState<{ text: string; done: boolean }[]>([]);
+  const { toast } = useToast();
 
   const vitals = useMemo(() => resident ? getMockVitals(resident.residentId) : [], [resident]);
   const labs = useMemo(() => resident ? getMockLabs(resident.residentId) : [], [resident]);
@@ -582,7 +729,10 @@ export function PatientOverlay({ resident, onClose, inline = false }: { resident
     setPmhx(lsGet(lsKey("pmhx"), profile.pmhx));
     setSochx(lsGet(lsKey("sochx"), profile.sochx));
     setAp(lsGet(lsKey("ap"), profile.ap));
-  }, [resident?.residentId]);
+    setDocIntakeState("idle");
+    setInjectedAllergies([]);
+    setIntakeFollowUps([]);
+  }, [resident?.residentId]); // eslint-disable-line
 
   useEffect(() => {
     if (inline) return;
@@ -606,7 +756,7 @@ export function PatientOverlay({ resident, onClose, inline = false }: { resident
   if (!isOpen || !resident) return null;
 
   const photoUrl = `https://i.pravatar.cc/100?img=${((resident.residentId - 6) % 70) + 1}`;
-  const hasAlerts = !!(resident.codeStatus || resident.allergies?.length || resident.infectionFlags?.length);
+  const hasAlerts = !!(resident.codeStatus || resident.allergies?.length || resident.infectionFlags?.length || injectedAllergies.length);
   const bmGaps = Math.max(0, (falls.length > 0 ? 1 : 0) + (prnLax > 3 ? 2 : 0));
 
   return (
@@ -633,7 +783,7 @@ export function PatientOverlay({ resident, onClose, inline = false }: { resident
                         <Shield className="w-3 h-3" />{resident.codeStatus}
                       </span>
                     )}
-                    {resident.allergies?.map(a => (
+                    {[...(resident.allergies ?? []), ...injectedAllergies].map(a => (
                       <span key={a} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-900/40 text-red-300 border border-red-500/40 uppercase">
                         <AlertCircle className="w-3 h-3" />ALLERGY: {a}
                       </span>
@@ -712,6 +862,32 @@ export function PatientOverlay({ resident, onClose, inline = false }: { resident
 
           {/* Right half */}
           <div className={inline ? "px-5 py-5 space-y-6" : "flex-1 overflow-y-auto px-5 py-5 space-y-6"}>
+            {/* AI Document Intake */}
+            {docIntakeState === "idle" && (
+              <button
+                onClick={() => {
+                  setDocIntakeState("processing");
+                  setTimeout(() => setDocIntakeState("reviewing"), 2000);
+                }}
+                className="w-full flex items-center gap-3 py-3.5 px-4 rounded-xl border-2 border-dashed border-amber-500/40 bg-amber-950/10 hover:bg-amber-950/25 hover:border-amber-500/60 transition-all group text-left"
+              >
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:bg-amber-500/30 transition-colors">
+                  <Upload className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-amber-300 leading-tight">Upload Discharge Summary (AI Auto-Chart)</p>
+                  <p className="text-xs text-amber-400/60 mt-0.5">PDF, DOCX, or plain text — AI extracts clinical entities</p>
+                </div>
+                <Sparkles className="w-4 h-4 text-amber-400/50 shrink-0" />
+              </button>
+            )}
+            {docIntakeState === "processing" && (
+              <div className="w-full flex items-center justify-center gap-3 py-3.5 px-4 rounded-xl border-2 border-amber-500/30 bg-amber-950/15">
+                <Loader2 className="w-5 h-5 text-amber-400 animate-spin shrink-0" />
+                <p className="text-sm font-semibold text-amber-300">AI extracting clinical entities…</p>
+              </div>
+            )}
+
             {/* Labs button */}
             <button onClick={() => setShowLabsDrawer(true)}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors font-bold text-sm">
@@ -770,11 +946,73 @@ export function PatientOverlay({ resident, onClose, inline = false }: { resident
                 ))}
               </div>
             </div>
+
+            {/* AI Smart Follow-Up Tracker — populated from document intake */}
+            {intakeFollowUps.length > 0 && (
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-violet-300">AI Smart Follow-Up Tracker</h3>
+                  <span className="text-[10px] text-violet-400/50 ml-1">— from Discharge Summary</span>
+                </div>
+                <div className="rounded-xl border border-violet-500/30 bg-violet-950/20 p-3.5 space-y-2.5">
+                  {intakeFollowUps.map((f, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setIntakeFollowUps(prev => prev.map((x, j) => j === i ? { ...x, done: !x.done } : x))}
+                      className="w-full flex items-start gap-3 text-left group"
+                    >
+                      <div className={[
+                        "mt-0.5 w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-all",
+                        f.done
+                          ? "bg-violet-600 border-violet-400"
+                          : "border-violet-500/40 group-hover:border-violet-400",
+                      ].join(" ")}>
+                        {f.done && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                      <span className={[
+                        "text-xs leading-relaxed transition-colors pt-0.5",
+                        f.done ? "line-through text-violet-400/40" : "text-violet-100/80",
+                      ].join(" ")}>
+                        {f.text}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Modals */}
+      {docIntakeState === "reviewing" && (
+        <DocIntakeModal
+          residentName={resident.name}
+          onClose={() => setDocIntakeState("idle")}
+          onApprove={(result) => {
+            if (result.pmhx.length > 0) {
+              const stamp = new Date().toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+              const appended =
+                (pmhx.trim() ? pmhx + (pmhx.endsWith("\n") ? "" : "\n") : "") +
+                `\n— Discharge Summary (${stamp}):\n${result.pmhx.map(p => `• ${p}`).join("\n")}`;
+              setPmhx(appended);
+              save("pmhx", appended);
+            }
+            if (result.allergies.length > 0) {
+              setInjectedAllergies(prev => [...new Set([...prev, ...result.allergies])]);
+            }
+            if (result.followUps.length > 0) {
+              setIntakeFollowUps(prev => [...prev, ...result.followUps.map(t => ({ text: t, done: false }))]);
+            }
+            setDocIntakeState("idle");
+            toast({
+              title: "Chart Updated from Discharge Summary",
+              description: `${result.pmhx.length} PMHx item${result.pmhx.length !== 1 ? "s" : ""}, ${result.allergies.length} allerg${result.allergies.length !== 1 ? "ies" : "y"}, ${result.followUps.length} follow-up${result.followUps.length !== 1 ? "s" : ""} applied.`,
+            });
+          }}
+        />
+      )}
       {showLabsDrawer && <LabsDrawer labs={labs} onClose={() => setShowLabsDrawer(false)} />}
       {vitalModal && <VitalsTrendModal vitalKey={vitalModal} records={vitals} onClose={() => setVitalModal(null)} />}
       {showTransfer && <HospitalTransferModal resident={resident} onClose={() => setShowTransfer(false)} />}
