@@ -70,6 +70,9 @@ import {
   Users,
   MessageCircle,
   ExternalLink,
+  Sparkles,
+  ChevronUp,
+  Check,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -124,6 +127,357 @@ const BRISTOL_COLORS: Record<number, { dot: string; label: string; text: string 
   6: { dot: "bg-[#d7ccc8]", label: "Fluffy pieces",       text: "text-[#1a1a1a]" },
   7: { dot: "bg-[#efebe9]", label: "Entirely liquid",     text: "text-[#1a1a1a]" },
 };
+
+// ── AI Clinical Copilot ───────────────────────────────────────────────────────
+
+type TriggerKey = "UTI" | "Fall" | "Agitation";
+
+const TRIGGER_KEYWORDS: Record<TriggerKey, string[]> = {
+  UTI:       ["uti", "urinary tract", "dysuria", "bacteriuria", "pyuria", "cystitis"],
+  Fall:      ["fall", "fell", "fallen", "collapse", "slipped", "trip"],
+  Agitation: ["agitat", "aggressiv", "combative", "restless", "behaviou", "behavior"],
+};
+
+interface ClinicalSuggestion {
+  investigations: string[];
+  evidence: { label: string; org: string }[];
+  plan: string[];
+  followUps: string[];
+}
+
+const CLINICAL_SUGGESTIONS: Record<TriggerKey, ClinicalSuggestion> = {
+  UTI: {
+    investigations: [
+      "Urinalysis (UA) with microscopy",
+      "Urine Culture & Sensitivity (C&S)",
+      "CBC with differential",
+      "BMP — renal function (Cr, BUN)",
+    ],
+    evidence: [
+      { label: "Asymptomatic Bacteriuria in Older Adults",       org: "Choosing Wisely Canada" },
+      { label: "UTI in Long-Term Care — Clinical Practice Guide", org: "AMDA" },
+      { label: "Beers Criteria — Antibiotics in Older Adults",   org: "AGS 2023" },
+    ],
+    plan: [
+      "Push oral fluids — target ≥ 1.5 L/day",
+      "Monitor vitals q4h × 48h",
+      "Hold antibiotic pending C&S if clinically stable",
+      "Review current medications for nephrotoxicity",
+      "Reassess in 24–48h; escalate if clinical deterioration",
+    ],
+    followUps: [
+      "Recheck urinalysis in 48–72h",
+      "Follow up on urine C&S sensitivities (Friday)",
+      "Reassess antibiotic choice once C&S available",
+      "Review fluid intake log at next round",
+    ],
+  },
+  Fall: {
+    investigations: [
+      "Post-fall neurological assessment (GCS)",
+      "X-ray hip, spine, or wrist if mechanism warrants",
+      "Blood glucose stat",
+      "Orthostatic blood pressure check",
+    ],
+    evidence: [
+      { label: "Falls Prevention in Long-Term Care",              org: "Choosing Wisely Canada" },
+      { label: "High-Fall-Risk Medications (Beers Criteria)",     org: "AGS 2023" },
+      { label: "Falls in Older People — NG147",                  org: "NICE Guidelines" },
+    ],
+    plan: [
+      "Document fall circumstances, witnesses, and mechanism",
+      "Update Morse Fall Scale risk assessment",
+      "Medication review — identify high-risk agents (benzos, diuretics, antipsychotics)",
+      "Physiotherapy referral for gait and balance assessment",
+      "Notify SDM/family; revise safety care plan",
+    ],
+    followUps: [
+      "Physiotherapy assessment scheduled within 72h",
+      "Medication review completed by next physician visit",
+      "Updated care plan reviewed with SDM/family",
+      "Post-fall incident report filed and reviewed",
+    ],
+  },
+  Agitation: {
+    investigations: [
+      "Delirium screen — CAM assessment",
+      "Urinalysis (rule out UTI as precipitant)",
+      "Blood glucose and electrolytes",
+      "Review medication changes in the last 7 days",
+    ],
+    evidence: [
+      { label: "Managing Behavioural Symptoms in Dementia",      org: "CCSMH Guidelines" },
+      { label: "Antipsychotics in Dementia — Deprescribing",     org: "Choosing Wisely Canada" },
+      { label: "Beers Criteria — Antipsychotics in LTC",         org: "AGS 2023" },
+    ],
+    plan: [
+      "Non-pharmacological first: music, familiar objects, reorientation",
+      "Identify and address underlying triggers (pain, noise, unmet needs)",
+      "Document PRN medication response and titration",
+      "Consider geriatric psychiatry or P.I.E.C.E.S. consult",
+      "Update behavioural care plan with triggers and effective strategies",
+    ],
+    followUps: [
+      "Behavioural log review in 48h",
+      "PRN medication efficacy assessment at next round",
+      "Consider geriatric psychiatry referral if no improvement in 72h",
+      "Nursing to document triggers and de-escalation strategies daily",
+    ],
+  },
+};
+
+function AIClinicalCopilot({ noteText, onApplyToNote }: {
+  noteText: string;
+  onApplyToNote: (text: string) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [activeTrigger, setActiveTrigger] = useState<TriggerKey | null>(null);
+  const [appliedTriggers, setAppliedTriggers] = useState<Set<TriggerKey>>(new Set());
+
+  const detectedTriggers = useMemo<TriggerKey[]>(() => {
+    const lower = noteText.toLowerCase();
+    return (Object.keys(TRIGGER_KEYWORDS) as TriggerKey[]).filter((key) =>
+      TRIGGER_KEYWORDS[key].some((kw) => lower.includes(kw)),
+    );
+  }, [noteText]);
+
+  // Auto-expand when the trigger set first appears or a new trigger is added
+  const triggersKey = detectedTriggers.join(",");
+  useEffect(() => {
+    if (detectedTriggers.length > 0) {
+      setIsExpanded(true);
+      setActiveTrigger((prev) =>
+        prev && detectedTriggers.includes(prev) ? prev : detectedTriggers[0],
+      );
+    } else {
+      setIsExpanded(false);
+      setActiveTrigger(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggersKey]);
+
+  const currentTrigger: TriggerKey | null =
+    activeTrigger && detectedTriggers.includes(activeTrigger)
+      ? activeTrigger
+      : (detectedTriggers[0] ?? null);
+
+  const suggestion = currentTrigger ? CLINICAL_SUGGESTIONS[currentTrigger] : null;
+
+  if (detectedTriggers.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-blue-500/30 bg-blue-950/20 overflow-hidden">
+      {/* Header / toggle */}
+      <button
+        onClick={() => setIsExpanded((p) => !p)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-blue-950/30 transition-colors"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+          <div className="text-left min-w-0">
+            <p className="text-xs font-bold text-blue-300">AI Decision Aid — Clinical Copilot</p>
+            <p className="text-[10px] text-blue-400/60 mt-0.5 truncate">
+              Detected: {detectedTriggers.join(", ")}
+            </p>
+          </div>
+        </div>
+        {isExpanded
+          ? <ChevronUp   className="w-4 h-4 text-blue-400/60 shrink-0" />
+          : <ChevronDown className="w-4 h-4 text-blue-400/60 shrink-0" />}
+      </button>
+
+      {isExpanded && suggestion && currentTrigger && (
+        <div className="border-t border-blue-500/20 px-4 pt-3 pb-4 space-y-4">
+          {/* Trigger tabs (when >1 trigger) */}
+          {detectedTriggers.length > 1 && (
+            <div className="flex gap-1.5">
+              {detectedTriggers.map((t) => (
+                <button
+                  key={t}
+                  onClick={(e) => { e.stopPropagation(); setActiveTrigger(t); }}
+                  className={[
+                    "px-3 py-1 rounded-lg text-xs font-bold border transition-all",
+                    currentTrigger === t
+                      ? "bg-blue-700/40 border-blue-400 text-blue-200"
+                      : "border-blue-500/20 text-blue-400/60 hover:border-blue-400/40",
+                  ].join(" ")}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 1 — Suggested Investigations */}
+          <div className="space-y-2">
+            <p className="text-[10px] uppercase tracking-widest font-bold text-blue-300/70 flex items-center gap-1.5">
+              <Search className="w-3 h-3" /> Suggested Investigations
+            </p>
+            <ul className="space-y-1.5">
+              {suggestion.investigations.map((item) => (
+                <li key={item} className="flex items-start gap-2 text-xs text-blue-100/80 leading-relaxed">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-[5px] shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* 2 — Evidence & Algorithms */}
+          <div className="space-y-2">
+            <p className="text-[10px] uppercase tracking-widest font-bold text-blue-300/70 flex items-center gap-1.5">
+              <BookOpen className="w-3 h-3" /> Evidence &amp; Algorithms
+            </p>
+            <ul className="space-y-1.5">
+              {suggestion.evidence.map((e) => (
+                <li key={e.label} className="flex items-start gap-2 text-xs leading-relaxed">
+                  <ExternalLink className="w-3 h-3 text-blue-400 mt-[2px] shrink-0" />
+                  <span>
+                    <span className="text-blue-200 font-medium">{e.label}</span>
+                    <span className="text-blue-400/50 ml-1.5">— {e.org}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* 3 — Suggested Plan */}
+          <div className="space-y-2">
+            <p className="text-[10px] uppercase tracking-widest font-bold text-blue-300/70 flex items-center gap-1.5">
+              <ClipboardList className="w-3 h-3" /> Suggested Plan
+            </p>
+            <ul className="space-y-1.5">
+              {suggestion.plan.map((item) => (
+                <li key={item} className="flex items-start gap-2 text-xs text-blue-100/80 leading-relaxed">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-[5px] shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => {
+                const planBlock = `\n\nSuggested Plan (${currentTrigger}):\n${suggestion.plan.map((p) => `• ${p}`).join("\n")}`;
+                onApplyToNote(planBlock);
+                setAppliedTriggers((p) => new Set([...p, currentTrigger]));
+              }}
+              disabled={appliedTriggers.has(currentTrigger)}
+              className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-700/30 border border-blue-500/40 text-blue-200 text-xs font-bold hover:bg-blue-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {appliedTriggers.has(currentTrigger) ? (
+                <><Check className="w-3.5 h-3.5 text-emerald-400" /> Applied to Note</>
+              ) : (
+                <><Plus className="w-3.5 h-3.5" /> Apply to Note</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── AI Follow-Up Tracker ──────────────────────────────────────────────────────
+
+function AIFollowUpTracker({ noteText }: { noteText: string }) {
+  const { toast } = useToast();
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+
+  const detectedTriggers = useMemo<TriggerKey[]>(() => {
+    const lower = noteText.toLowerCase();
+    return (Object.keys(TRIGGER_KEYWORDS) as TriggerKey[]).filter((key) =>
+      TRIGGER_KEYWORDS[key].some((kw) => lower.includes(kw)),
+    );
+  }, [noteText]);
+
+  const followUps = useMemo<string[]>(() => {
+    const items: string[] = [];
+    detectedTriggers.forEach((t) => items.push(...CLINICAL_SUGGESTIONS[t].followUps));
+    if (items.length === 0 && noteText.trim().length > 50) {
+      items.push("Follow-up at next scheduled physician visit");
+      items.push("Nursing to monitor and document daily progress");
+      items.push("Reassess response to current interventions in 48–72h");
+    }
+    return items;
+  }, [detectedTriggers, noteText]);
+
+  // Reset checks when trigger set changes
+  const triggersKey = detectedTriggers.join(",");
+  useEffect(() => { setChecked(new Set()); }, [triggersKey]); // eslint-disable-line
+
+  if (followUps.length === 0) return null;
+
+  const toggle = (i: number) =>
+    setChecked((p) => { const n = new Set(p); n.has(i) ? n.delete(i) : n.add(i); return n; });
+
+  const handleAddToTaskList = () => {
+    const pending = followUps.filter((_, i) => !checked.has(i));
+    const count = pending.length;
+    if (count === 0) { toast({ title: "All follow-ups already checked off." }); return; }
+    navigator.clipboard.writeText(pending.map((f) => `[ ] ${f}`).join("\n")).catch(() => {});
+    toast({
+      title: `${count} follow-up${count !== 1 ? "s" : ""} added to Global Task List`,
+      description: "Unchecked items copied to clipboard.",
+    });
+  };
+
+  return (
+    <div className="rounded-xl border border-violet-500/30 bg-violet-950/20 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-violet-500/20">
+        <FileText className="w-4 h-4 text-violet-400 shrink-0" />
+        <div>
+          <p className="text-xs font-bold text-violet-300">AI Smart Follow-Up Tracker</p>
+          <p className="text-[10px] text-violet-400/60 mt-0.5">
+            Extracted follow-ups — {followUps.length} item{followUps.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
+
+      {/* Checklist */}
+      <div className="px-4 py-3 space-y-2.5">
+        {followUps.map((item, i) => (
+          <button
+            key={item}
+            onClick={() => toggle(i)}
+            className="w-full flex items-start gap-3 text-left group"
+          >
+            <div
+              className={[
+                "mt-0.5 w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-all",
+                checked.has(i)
+                  ? "bg-violet-600 border-violet-400"
+                  : "border-violet-500/40 bg-transparent group-hover:border-violet-400",
+              ].join(" ")}
+            >
+              {checked.has(i) && <Check className="w-2.5 h-2.5 text-white" />}
+            </div>
+            <span
+              className={[
+                "text-xs leading-relaxed transition-colors pt-0.5",
+                checked.has(i)
+                  ? "line-through text-violet-400/40"
+                  : "text-violet-100/80 group-hover:text-violet-100",
+              ].join(" ")}
+            >
+              {item}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Footer action */}
+      <div className="px-4 pb-3.5 pt-1">
+        <button
+          onClick={handleAddToTaskList}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-700/30 border border-violet-500/40 text-violet-200 text-xs font-bold hover:bg-violet-700/50 transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add to Global Task List
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── Drill-down Panel ──────────────────────────────────────────────────────────
 
@@ -796,14 +1150,26 @@ function DrillPanel({ resident, onClose, onOpenOverlay }: DrillPanelProps) {
               </button>
             </div>
 
-            <div className="flex-1 px-6 pt-4 pb-2 overflow-hidden">
-              <textarea
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                placeholder={"Begin typing your clinical note here…\n\nInclude: assessment findings, interventions, resident response, and plan."}
-                autoFocus
-                className="w-full h-full resize-none bg-transparent text-foreground text-sm leading-relaxed focus:outline-none placeholder:text-muted-foreground"
-              />
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <div className="px-6 pt-4 pb-3">
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder={"Begin typing your clinical note here…\n\nInclude: assessment findings, interventions, resident response, and plan."}
+                  autoFocus
+                  rows={8}
+                  className="w-full resize-none bg-transparent text-foreground text-sm leading-relaxed focus:outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+              <div className="px-6 pb-5 space-y-3">
+                <AIClinicalCopilot
+                  noteText={noteText}
+                  onApplyToNote={(text) =>
+                    setNoteText((p) => p + (p && !p.endsWith("\n") ? "\n" : "") + text)
+                  }
+                />
+                <AIFollowUpTracker noteText={noteText} />
+              </div>
             </div>
 
             <div className="px-6 py-4 border-t border-border shrink-0 flex gap-3">
