@@ -2735,12 +2735,582 @@ export function FrontlineCommBinder() {
   );
 }
 
+// ── Clinical Forms View ───────────────────────────────────────────────────────
+
+type ClinicalFormType = "admission" | "codestatus" | "ppo";
+
+interface SignatureRecord {
+  physicianName: string;
+  designation: string;
+  signedAt: string;
+}
+
+function SignedBadge({ sig, onEdit }: { sig: SignatureRecord; onEdit: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-950/40 border border-emerald-700/50 px-4 py-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div>
+          <p className="text-xs font-bold text-emerald-300">Signed &amp; Locked</p>
+          <p className="text-xs text-emerald-400/70 mt-0.5">
+            {sig.physicianName}{sig.designation ? `, ${sig.designation}` : ""} &mdash;{" "}
+            {new Date(sig.signedAt).toLocaleString("en-CA", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={onEdit}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-700/50 text-emerald-400 hover:bg-emerald-950/60 text-xs font-bold transition-colors shrink-0"
+      >
+        <Pencil className="w-3 h-3" />
+        Edit &amp; Unlock
+      </button>
+    </div>
+  );
+}
+
+function SignaturePanel({ onSign }: { onSign: (name: string, designation: string) => void }) {
+  const [name, setName] = useState("");
+  const [designation, setDesignation] = useState("");
+  return (
+    <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-5 space-y-4">
+      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+        <UserCheck className="w-3.5 h-3.5 text-primary" /> Physician Signature
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Full Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Dr. Full Name"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Designation</label>
+          <input
+            type="text"
+            value={designation}
+            onChange={(e) => setDesignation(e.target.value)}
+            placeholder="e.g. MD, CCFP, Geriatrician"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+      </div>
+      <button
+        onClick={() => { if (name.trim()) onSign(name.trim(), designation.trim()); }}
+        disabled={!name.trim()}
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-primary/20"
+      >
+        <Save className="w-4 h-4" />
+        Sign &amp; Lock Order
+      </button>
+    </div>
+  );
+}
+
+function OptionChip({ label, active, locked, onClick, activeClass }: {
+  label: string; active: boolean; locked: boolean; onClick: () => void; activeClass?: string;
+}) {
+  return (
+    <button
+      disabled={locked}
+      onClick={onClick}
+      className={[
+        "px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all",
+        active
+          ? (activeClass ?? "bg-primary/20 border-primary text-primary shadow-sm")
+          : "bg-card border-border text-foreground hover:border-primary/40",
+        locked ? "opacity-70 cursor-default" : "",
+      ].join(" ")}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ─── Admission Orders ──────────────────────────────────────────────────────────
+
+const ACTIVITY_OPTIONS = ["Bedrest", "Bedrest with Bathroom Privileges", "Chair", "Ambulatory with Assist", "Independent"];
+const DIET_OPTIONS    = ["Regular", "Soft", "Minced", "Pureed", "Thickened — Nectar", "Thickened — Honey", "NPO", "PEG Tube"];
+const FLUID_OPTIONS   = ["No Restriction", "1000 mL/day", "1200 mL/day", "1500 mL/day"];
+const VITALS_OPTIONS  = ["Daily", "BID", "TID", "Weekly", "PRN Only"];
+const O2_OPTIONS      = ["None", "PRN", "Continuous"];
+
+interface AdmissionData {
+  activity: string; diet: string; fluidRestriction: string; vitalsFreq: string;
+  fallPrecautions: string; o2Order: string; o2FlowRate: string; woundCare: string; specialInstructions: string;
+}
+const defaultAdmission: AdmissionData = {
+  activity: "", diet: "", fluidRestriction: "No Restriction", vitalsFreq: "Daily",
+  fallPrecautions: "", o2Order: "None", o2FlowRate: "", woundCare: "", specialInstructions: "",
+};
+
+function AdmissionOrdersForm({ residentName }: { residentName: string }) {
+  const { toast } = useToast();
+  const [sig, setSig] = useState<SignatureRecord | null>(null);
+  const [d, setD] = useState<AdmissionData>(defaultAdmission);
+  const locked = sig !== null;
+  const set = (patch: Partial<AdmissionData>) => { if (!locked) setD((p) => ({ ...p, ...patch })); };
+
+  const sectionLabel = (icon: ReactNode, text: string) => (
+    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+      {icon}{text}
+    </p>
+  );
+
+  return (
+    <div className="space-y-7">
+      {sig && <SignedBadge sig={sig} onEdit={() => setSig(null)} />}
+
+      <div className="space-y-2">
+        {sectionLabel(<Activity className="w-3.5 h-3.5 text-blue-400" />, "Activity Level")}
+        <div className="flex flex-wrap gap-2">
+          {ACTIVITY_OPTIONS.map((o) => (
+            <OptionChip key={o} label={o} active={d.activity === o} locked={locked}
+              onClick={() => set({ activity: d.activity === o ? "" : o })} />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {sectionLabel(<ClipboardList className="w-3.5 h-3.5 text-amber-400" />, "Diet Order")}
+        <div className="flex flex-wrap gap-2">
+          {DIET_OPTIONS.map((o) => (
+            <OptionChip key={o} label={o} active={d.diet === o} locked={locked}
+              onClick={() => set({ diet: d.diet === o ? "" : o })} />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {sectionLabel(<Droplets className="w-3.5 h-3.5 text-sky-400" />, "Fluid Restriction")}
+        <div className="flex flex-wrap gap-2">
+          {FLUID_OPTIONS.map((o) => (
+            <OptionChip key={o} label={o} active={d.fluidRestriction === o} locked={locked}
+              onClick={() => set({ fluidRestriction: d.fluidRestriction === o ? "" : o })} />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {sectionLabel(<Activity className="w-3.5 h-3.5 text-emerald-400" />, "Vital Signs Frequency")}
+        <div className="flex flex-wrap gap-2">
+          {VITALS_OPTIONS.map((o) => (
+            <OptionChip key={o} label={o} active={d.vitalsFreq === o} locked={locked}
+              onClick={() => set({ vitalsFreq: d.vitalsFreq === o ? "" : o })} />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {sectionLabel(<AlertTriangle className="w-3.5 h-3.5 text-amber-400" />, "Fall Precautions")}
+        <div className="flex gap-3">
+          {([
+            ["Yes — Precautions Active", "bg-amber-700/40 border-amber-400 text-amber-200"],
+            ["No — Routine Only",         "bg-slate-600/30 border-slate-400 text-slate-200"],
+          ] as const).map(([label, activeCls]) => (
+            <button
+              key={label}
+              disabled={locked}
+              onClick={() => set({ fallPrecautions: d.fallPrecautions === label ? "" : label })}
+              className={[
+                "flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all",
+                d.fallPrecautions === label ? activeCls : "bg-card border-border text-foreground hover:border-primary/40",
+                locked ? "opacity-70 cursor-default" : "",
+              ].join(" ")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {sectionLabel(<TrendingUp className="w-3.5 h-3.5 text-sky-400" />, "Oxygen Order")}
+        <div className="flex flex-wrap gap-2">
+          {O2_OPTIONS.map((o) => (
+            <OptionChip key={o} label={o} active={d.o2Order === o} locked={locked}
+              onClick={() => set({ o2Order: d.o2Order === o ? "" : o })} />
+          ))}
+        </div>
+        {d.o2Order !== "None" && d.o2Order !== "" && (
+          <div className="flex items-center gap-3 mt-2">
+            <label className="text-xs text-muted-foreground font-semibold whitespace-nowrap">Flow rate:</label>
+            <input
+              type="text"
+              value={d.o2FlowRate}
+              onChange={(e) => set({ o2FlowRate: e.target.value })}
+              disabled={locked}
+              placeholder="e.g. 2 L/min via nasal cannula"
+              className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-70"
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Wound / Skin Care Orders</p>
+        <textarea
+          value={d.woundCare}
+          onChange={(e) => set({ woundCare: e.target.value })}
+          disabled={locked}
+          rows={3}
+          placeholder="Wound care protocol, dressing orders, repositioning schedule…"
+          className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none leading-relaxed disabled:opacity-70"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Special Instructions</p>
+        <textarea
+          value={d.specialInstructions}
+          onChange={(e) => set({ specialInstructions: e.target.value })}
+          disabled={locked}
+          rows={3}
+          placeholder="Isolation precautions, monitoring requirements, consults ordered…"
+          className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none leading-relaxed disabled:opacity-70"
+        />
+      </div>
+
+      {!locked && (
+        <SignaturePanel
+          onSign={(name, desig) => {
+            setSig({ physicianName: name, designation: desig, signedAt: new Date().toISOString() });
+            toast({ title: "Admission Orders Signed", description: `Signed by ${name} for ${residentName}` });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Code Status Form ──────────────────────────────────────────────────────────
+
+const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNH", "DNR / DNH", "Comfort Measures Only", "No CPR / No Intubation"];
+const SDM_OPTIONS = ["Yes — SDM Agrees", "No — SDM Declines", "N/A — No SDM on File"];
+
+interface CodeStatusData {
+  codeStatus: string; polstCompleted: string; effectiveDate: string;
+  sdmAgrees: string; witnessName: string; notes: string;
+}
+const defaultCodeStatus: CodeStatusData = {
+  codeStatus: "", polstCompleted: "", effectiveDate: new Date().toISOString().slice(0, 10),
+  sdmAgrees: "", witnessName: "", notes: "",
+};
+
+function CodeStatusForm({ residentName }: { residentName: string }) {
+  const { toast } = useToast();
+  const [sig, setSig] = useState<SignatureRecord | null>(null);
+  const [d, setD] = useState<CodeStatusData>(defaultCodeStatus);
+  const locked = sig !== null;
+  const set = (patch: Partial<CodeStatusData>) => { if (!locked) setD((p) => ({ ...p, ...patch })); };
+
+  return (
+    <div className="space-y-7">
+      {sig && <SignedBadge sig={sig} onEdit={() => setSig(null)} />}
+
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 text-purple-400" /> Code Status
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {CODE_STATUS_OPTIONS.map((o) => (
+            <OptionChip
+              key={o}
+              label={o}
+              active={d.codeStatus === o}
+              locked={locked}
+              activeClass="bg-purple-800/40 border-purple-400 text-purple-200 shadow-sm"
+              onClick={() => set({ codeStatus: d.codeStatus === o ? "" : o })}
+            />
+          ))}
+        </div>
+        {d.codeStatus && (
+          <div className={[
+            "mt-2 rounded-xl border px-4 py-3 text-sm font-semibold",
+            ["Full Code"].includes(d.codeStatus)
+              ? "bg-emerald-950/40 border-emerald-700/50 text-emerald-300"
+              : ["Comfort Measures Only", "No CPR / No Intubation"].includes(d.codeStatus)
+              ? "bg-red-950/40 border-red-700/50 text-red-300"
+              : "bg-amber-950/40 border-amber-700/50 text-amber-300",
+          ].join(" ")}>
+            {d.codeStatus === "Full Code" && "All resuscitative measures to be attempted."}
+            {d.codeStatus === "DNR" && "Do Not Resuscitate — no CPR if cardiac arrest."}
+            {d.codeStatus === "DNH" && "Do Not Hospitalize — comfort care at facility."}
+            {d.codeStatus === "DNR / DNH" && "No CPR and no hospital transfer — comfort at facility."}
+            {d.codeStatus === "Comfort Measures Only" && "Comfort-focused care only. No life-prolonging interventions."}
+            {d.codeStatus === "No CPR / No Intubation" && "No cardiopulmonary resuscitation or mechanical ventilation."}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">POLST Completed</p>
+          <div className="flex gap-2">
+            {["Yes", "No"].map((o) => (
+              <button
+                key={o}
+                disabled={locked}
+                onClick={() => set({ polstCompleted: d.polstCompleted === o ? "" : o })}
+                className={[
+                  "flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition-all",
+                  d.polstCompleted === o
+                    ? o === "Yes" ? "bg-emerald-700/40 border-emerald-400 text-emerald-200" : "bg-red-800/40 border-red-400 text-red-200"
+                    : "bg-card border-border text-foreground hover:border-primary/40",
+                  locked ? "opacity-70 cursor-default" : "",
+                ].join(" ")}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Effective Date</p>
+          <input
+            type="date"
+            value={d.effectiveDate}
+            onChange={(e) => set({ effectiveDate: e.target.value })}
+            disabled={locked}
+            className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-70"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+          <UserCheck className="w-3.5 h-3.5 text-primary" /> SDM Agreement
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {SDM_OPTIONS.map((o) => (
+            <OptionChip key={o} label={o} active={d.sdmAgrees === o} locked={locked}
+              onClick={() => set({ sdmAgrees: d.sdmAgrees === o ? "" : o })} />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Witness Name &amp; Role</p>
+        <input
+          type="text"
+          value={d.witnessName}
+          onChange={(e) => set({ witnessName: e.target.value })}
+          disabled={locked}
+          placeholder="e.g. Jane Smith RN — Charge Nurse"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-70"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Clinical Notes</p>
+        <textarea
+          value={d.notes}
+          onChange={(e) => set({ notes: e.target.value })}
+          disabled={locked}
+          rows={3}
+          placeholder="Goals of care discussion summary, SDM contact, context for this decision…"
+          className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none leading-relaxed disabled:opacity-70"
+        />
+      </div>
+
+      {!locked && (
+        <SignaturePanel
+          onSign={(name, desig) => {
+            setSig({ physicianName: name, designation: desig, signedAt: new Date().toISOString() });
+            toast({ title: "Code Status Order Signed", description: `${d.codeStatus || "Order"} signed by ${name} for ${residentName}` });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Physician Periodic Orders (PPO) ──────────────────────────────────────────
+
+interface PPOData {
+  routineMeds: string; prnMeds: string; monitoring: string;
+  labOrders: string; followUpDate: string; renewalDate: string; specialInstructions: string;
+}
+const defaultPPO: PPOData = {
+  routineMeds: "", prnMeds: "", monitoring: "", labOrders: "",
+  followUpDate: "", renewalDate: "", specialInstructions: "",
+};
+
+function PPOForm({ residentName }: { residentName: string }) {
+  const { toast } = useToast();
+  const [sig, setSig] = useState<SignatureRecord | null>(null);
+  const [d, setD] = useState<PPOData>(defaultPPO);
+  const locked = sig !== null;
+  const set = (patch: Partial<PPOData>) => { if (!locked) setD((p) => ({ ...p, ...patch })); };
+
+  const areaCls = "w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none leading-relaxed disabled:opacity-70";
+  const inpCls  = "w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-70";
+  const lbl     = "text-xs font-bold uppercase tracking-widest text-muted-foreground";
+
+  return (
+    <div className="space-y-6">
+      {sig && <SignedBadge sig={sig} onEdit={() => setSig(null)} />}
+
+      <div className="space-y-2">
+        <p className={lbl}>Routine Medications</p>
+        <textarea value={d.routineMeds} onChange={(e) => set({ routineMeds: e.target.value })} disabled={locked} rows={5}
+          placeholder={"Metformin 500 mg PO BID\nLisinopril 5 mg PO daily\nCalcium + D3 1200 mg PO daily\nLevothyroxine 50 mcg PO daily AC"}
+          className={areaCls} />
+      </div>
+
+      <div className="space-y-2">
+        <p className={lbl}>PRN Medications</p>
+        <textarea value={d.prnMeds} onChange={(e) => set({ prnMeds: e.target.value })} disabled={locked} rows={4}
+          placeholder={"Acetaminophen 500 mg PO q4h PRN pain (max 3 g/day)\nHaloperidol 0.5 mg PO PRN agitation q6h\nLactulose 30 mL PO PRN constipation (max 1×/day)"}
+          className={areaCls} />
+      </div>
+
+      <div className="space-y-2">
+        <p className={lbl}>Monitoring Orders</p>
+        <textarea value={d.monitoring} onChange={(e) => set({ monitoring: e.target.value })} disabled={locked} rows={3}
+          placeholder={"Weight weekly\nFluid balance daily\nBlood glucose AC+HS"}
+          className={areaCls} />
+      </div>
+
+      <div className="space-y-2">
+        <p className={lbl}>Lab Orders</p>
+        <textarea value={d.labOrders} onChange={(e) => set({ labOrders: e.target.value })} disabled={locked} rows={2}
+          placeholder={"CBC, BMP — monthly\nHbA1c — q3 months\nINR weekly (if on warfarin)"}
+          className={areaCls} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <p className={lbl}>Follow-Up Date</p>
+          <input type="date" value={d.followUpDate} onChange={(e) => set({ followUpDate: e.target.value })} disabled={locked} className={inpCls} />
+        </div>
+        <div className="space-y-2">
+          <p className={lbl}>Order Renewal Date</p>
+          <input type="date" value={d.renewalDate} onChange={(e) => set({ renewalDate: e.target.value })} disabled={locked} className={inpCls} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className={lbl}>Special Instructions</p>
+        <textarea value={d.specialInstructions} onChange={(e) => set({ specialInstructions: e.target.value })} disabled={locked} rows={3}
+          placeholder="Allergy cross-references, specific timing notes, exceptions, cross-coverage instructions…"
+          className={areaCls} />
+      </div>
+
+      {!locked && (
+        <SignaturePanel
+          onSign={(name, desig) => {
+            setSig({ physicianName: name, designation: desig, signedAt: new Date().toISOString() });
+            toast({ title: "PPO Signed", description: `Periodic Physician Orders signed by ${name} for ${residentName}` });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Main ClinicalFormsView ────────────────────────────────────────────────────
+
+function ClinicalFormsView() {
+  const { data: residents = [] } = useListResidents({ query: { queryKey: getListResidentsQueryKey() } });
+  const [selectedResidentId, setSelectedResidentId] = useState<number | null>(null);
+  const [formType, setFormType] = useState<ClinicalFormType>("admission");
+  const selectedResident = residents.find((r) => r.id === selectedResidentId);
+
+  const FORM_TABS: { id: ClinicalFormType; label: string }[] = [
+    { id: "admission",  label: "Admission Orders" },
+    { id: "codestatus", label: "Code Status" },
+    { id: "ppo",        label: "Periodic Orders (PPO)" },
+  ];
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="space-y-1">
+        <h2 className="text-xl font-bold text-foreground">Clinical Forms</h2>
+        <p className="text-sm text-muted-foreground">Select a resident and form type to complete, edit, and sign.</p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Resident</p>
+        <select
+          value={selectedResidentId ?? ""}
+          onChange={(e) => { setSelectedResidentId(e.target.value ? Number(e.target.value) : null); }}
+          className="w-full bg-card border-2 border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary/60 text-sm appearance-none"
+        >
+          <option value="" className="bg-card">— Select a resident —</option>
+          {residents.map((r) => (
+            <option key={r.id} value={r.id} className="bg-card">
+              {r.name} — Room {r.room}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {selectedResident ? (
+        <>
+          <div className="flex items-center gap-4 rounded-xl bg-card border border-border px-4 py-3">
+            <img
+              src={`https://i.pravatar.cc/60?img=${((selectedResident.id - 6) % 70) + 1}`}
+              alt=""
+              className="w-12 h-12 rounded-xl object-cover shrink-0 border border-border"
+            />
+            <div>
+              <p className="font-bold text-foreground">{selectedResident.name}</p>
+              <p className="text-xs text-muted-foreground">Room {selectedResident.room}</p>
+            </div>
+          </div>
+
+          <div className="flex gap-1.5 bg-muted/30 rounded-xl p-1.5">
+            {FORM_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setFormType(tab.id)}
+                className={[
+                  "flex-1 py-2.5 rounded-lg text-xs font-bold transition-all",
+                  formType === tab.id
+                    ? "bg-card text-foreground shadow-sm border border-border/60"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="bg-card rounded-2xl border border-border p-6">
+            <div className="mb-6 pb-5 border-b border-border/60">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60">
+                {FORM_TABS.find((t) => t.id === formType)?.label}
+              </p>
+              <p className="text-base font-bold text-foreground mt-0.5">{selectedResident.name}</p>
+              <p className="text-xs text-muted-foreground">Room {selectedResident.room}</p>
+            </div>
+            {formType === "admission"  && <AdmissionOrdersForm key={`admission-${selectedResident.id}`}  residentName={selectedResident.name} />}
+            {formType === "codestatus" && <CodeStatusForm      key={`codestatus-${selectedResident.id}`} residentName={selectedResident.name} />}
+            {formType === "ppo"        && <PPOForm             key={`ppo-${selectedResident.id}`}        residentName={selectedResident.name} />}
+          </div>
+        </>
+      ) : (
+        <div className="rounded-2xl border border-border bg-card p-16 text-center space-y-3">
+          <ClipboardList className="w-10 h-10 text-muted-foreground/30 mx-auto" />
+          <p className="text-muted-foreground font-medium">Select a resident to begin</p>
+          <p className="text-xs text-muted-foreground/60">Choose from the dropdown above to open their clinical forms.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
   const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
-  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual">("population");
+  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual" | "forms">("population");
   const [overlayResident, setOverlayResident] = useState<ResidentAlertSummary | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -2928,6 +3498,18 @@ export default function PhysicianDashboard() {
             <Video className="w-4 h-4" />
             Virtual Health
           </button>
+          <button
+            onClick={() => setView("forms")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "forms"
+                ? "bg-rose-700/20 border-rose-500 text-rose-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-rose-500/40",
+            ].join(" ")}
+          >
+            <ClipboardList className="w-4 h-4" />
+            Clinical Forms
+          </button>
         </div>
       </div>
 
@@ -2938,6 +3520,7 @@ export default function PhysicianDashboard() {
         {view === "nlq" && data && <NLQView residents={data.residents} />}
         {view === "qi" && data && <QIView residents={data.residents} />}
         {view === "virtual" && <VirtualHealthView />}
+        {view === "forms"   && <ClinicalFormsView />}
 
 
         {/* Resident Summary Table */}
