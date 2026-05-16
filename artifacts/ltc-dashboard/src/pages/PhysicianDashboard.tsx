@@ -2713,6 +2713,8 @@ function CarePathwaysView() {
   const { toast } = useToast();
   const [isExpanded, setIsExpanded] = useState(true);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [committedText, setCommittedText] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const toggleCheck = (id: string) =>
     setChecked((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -2725,9 +2727,40 @@ function CarePathwaysView() {
       toast({ title: "No orders selected", description: "Select at least one order before committing.", variant: "destructive" });
       return;
     }
+    const now = new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
+    const lines: string[] = [
+      "STANDARDIZED CARE PATHWAY ORDERS",
+      "Unintentional Weight Loss & FTT Diagnostic & Clinical Orders",
+      `Form Ref: LTC-FORM-2024 (Rev. 2026) — Signed ${now}`,
+      "",
+    ];
+    STEP_META.forEach(({ step, title }) => {
+      const stepOrders = PATHWAY_ORDERS.filter((o) => o.step === step && checked.has(o.id));
+      if (stepOrders.length === 0) return;
+      lines.push(`STEP ${step}: ${title.toUpperCase()}`);
+      stepOrders.forEach((o, i) => {
+        lines.push(`  ${i + 1}. ${o.label}`);
+        lines.push(`     ${o.detail}`);
+      });
+      lines.push("");
+    });
+    lines.push("---");
+    lines.push("Orders committed to eMAR and Care Directive files.");
+    const text = lines.join("\n");
+    setCommittedText(text);
+    setCopied(false);
+    navigator.clipboard.writeText(text).catch(() => {});
     toast({
       title: "Orders committed",
-      description: "Orders successfully committed to Electronic Medication/Administration Record (eMAR) and Care Directive files.",
+      description: "Orders committed to eMAR. Formatted summary ready to copy below.",
+    });
+  };
+
+  const handleCopyText = () => {
+    if (!committedText) return;
+    navigator.clipboard.writeText(committedText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     });
   };
 
@@ -2873,6 +2906,35 @@ function CarePathwaysView() {
           </div>
         )}
       </div>
+
+      {/* Copy-paste output box — appears after commit */}
+      {committedText && (
+        <div className="rounded-2xl border border-primary/30 bg-card overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
+            <div>
+              <p className="font-bold text-sm text-foreground">Order Summary — Ready to Paste</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Copy and paste into an email, referral, or external EMR</p>
+            </div>
+            <button
+              onClick={handleCopyText}
+              className={["flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm border-2 transition-all active:scale-[0.97]",
+                copied
+                  ? "bg-green-700/20 border-green-500 text-green-300"
+                  : "bg-primary/10 border-primary/40 text-primary hover:bg-primary/20"].join(" ")}
+            >
+              {copied ? <Check className="w-4 h-4" /> : <ClipboardList className="w-4 h-4" />}
+              {copied ? "Copied!" : "Copy to Clipboard"}
+            </button>
+          </div>
+          <textarea
+            readOnly
+            value={committedText}
+            rows={Math.min(committedText.split("\n").length + 1, 20)}
+            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+            className="w-full px-6 py-4 bg-transparent text-sm font-mono text-foreground/90 leading-relaxed resize-none focus:outline-none"
+          />
+        </div>
+      )}
     </div>
   );
 }
