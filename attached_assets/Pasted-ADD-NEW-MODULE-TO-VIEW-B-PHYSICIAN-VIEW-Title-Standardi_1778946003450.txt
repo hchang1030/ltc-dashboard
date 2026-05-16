@@ -1,0 +1,39 @@
+ADD NEW MODULE TO VIEW B: PHYSICIAN VIEW
+- Title: "📋 Standardized Care Pathways (Order Sets)"
+- Layout: An accordion-style collapsible card system optimized for iPad finger taps.
+
+1. Header Layer:
+   - Displays the Order Set Title: "Unintentional Weight Loss & FTT Diagnostic & Clinical Orders".
+   - Includes a trailing Chevron icon that toggles the collapse/expand state of the underlying orders card using React state.
+   - Includes a subtle badge showing: "Form Ref: LTC-FORM-2024 (Rev. 2026)".
+
+2. High-Alert Warning Banners (Always visible when expanded):
+   - Red Outline Alert Box: "CLINICAL ALERT: Unintentional weight loss is a major regulatory and quality-of-care metric in LTC. Knee-jerk ordering of commercial high-protein supplements is often ineffective and can reduce intake of normal meals. Prioritize identifying reversible causes (dentition, dysphagia, depression, polypharmacy)."
+   - Solid Red Warning Box: "⚠️ CONTRAINDICATED: Megestrol acetate (Megace) is strongly discouraged by the Beers Criteria in older adults due to a high risk of deep vein thrombosis (DVT), fluid retention, and increased mortality with minimal lean muscle mass benefit."
+
+3. The 4-Step Interactive Order Selection:
+   Inside the expanded container, display a vertical stack of the 4 procedural steps with interactive checkboxes mapped to local state.
+
+   - STEP 1: Diagnostic Workup & Allied Health Consults
+     [ ] Baseline Diagnostics: Order CBC, Albumin, TSH, Electrolytes, Creatinine, Calcium, and Fasting Glucose.
+     [ ] Dentition Check: Inspect mouth for poorly fitting dentures, severe dental caries, dry mouth (xerostomia), or oral candidiasis (thrush).
+     [ ] Depression Screening: Administer the Geriatric Depression Scale (GDS) or PHQ-9 modified for dementia.
+     [ ] Consult Dietitian: Comprehensive nutritional assessment, calorie count, and food preference audit.
+     [ ] Consult Speech-Language Pathology (SLP): Swallowing evaluation if signs of dysphagia (coughing/choking during meals) are present.
+
+   - STEP 2: Medication Review & Deprescribing
+     [ ] Audit Medication Regimen: Review and taper/discontinue appetite-suppressing medications if clinically safe: Cholinesterase Inhibitors (donepezil, galantamine, rivastigmine), Activating SSRIs (fluoxetine), Topiramate, and chronic Digoxin (rule out toxicity).
+     [ ] Supplement Consolidation: Consolidate or eliminate non-essential supplements to address high-pill-burden configurations.
+
+   - STEP 3: Dietary & Nursing Interventions
+     [ ] Weight & Fluid Monitoring: Implement weekly weights x 4 weeks, then monthly once stable. Record food and fluid intake records x 7 days.
+     [ ] Food Enhancement: Provide nutrient-dense options (e.g., add real butter, cream, or gravy to meals; offer full-fat dairy/whole milk instead of skim).
+     [ ] Dining Environment: Provide feeding assistance or verbal cueing during meals. Serve meals in a calm, socially engaging dining environment. Encourage small, frequent finger foods and snacks between meals.
+
+   - STEP 4: Pharmacological Appetite Stimulation (Safe Alternatives)
+     - Display an inline info tag: "Criteria: Consider only if non-pharmacological interventions fail, weight loss is severe (>5% in 1 month or >10% in 6 months), and it aligns with Goals of Care."
+     [ ] mirtazapine (Remeron) 7.5 mg PO at bedtime. (Blocks 5-HT2/3 receptors to induce weight gain, stimulate appetite, and improve nocturnal sleep. Titrate to 15 mg if tolerated after 2 weeks).
+
+4. Global Execution Button:
+   - At the bottom of the order set card, add a button labeled "Sign & Commit Selected Orders".
+   - When clicked, open a small confirmation toast showing: "Orders successfully committed to Electronic Medication/Administration Record (eMAR) and Care Directive files."

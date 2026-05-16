@@ -2664,6 +2664,219 @@ function SortTh({ label, sortK, currentKey, currentDir, onSort }: {
   );
 }
 
+// ── Care Pathways View ────────────────────────────────────────────────────────
+
+interface PathwayOrder {
+  id: string;
+  step: number;
+  label: string;
+  detail: string;
+}
+
+const PATHWAY_ORDERS: PathwayOrder[] = [
+  // Step 1 — Diagnostic Workup & Allied Health Consults
+  { id: "s1_diagnostics", step: 1, label: "Baseline Diagnostics",
+    detail: "Order CBC, Albumin, TSH, Electrolytes, Creatinine, Calcium, and Fasting Glucose." },
+  { id: "s1_dentition", step: 1, label: "Dentition Check",
+    detail: "Inspect mouth for poorly fitting dentures, severe dental caries, dry mouth (xerostomia), or oral candidiasis (thrush)." },
+  { id: "s1_depression", step: 1, label: "Depression Screening",
+    detail: "Administer the Geriatric Depression Scale (GDS) or PHQ-9 modified for dementia." },
+  { id: "s1_dietitian", step: 1, label: "Consult Dietitian",
+    detail: "Comprehensive nutritional assessment, calorie count, and food preference audit." },
+  { id: "s1_slp", step: 1, label: "Consult Speech-Language Pathology (SLP)",
+    detail: "Swallowing evaluation if signs of dysphagia (coughing/choking during meals) are present." },
+  // Step 2 — Medication Review & Deprescribing
+  { id: "s2_meds", step: 2, label: "Audit Medication Regimen",
+    detail: "Review and taper/discontinue appetite-suppressing medications if clinically safe: Cholinesterase Inhibitors (donepezil, galantamine, rivastigmine), Activating SSRIs (fluoxetine), Topiramate, and chronic Digoxin (rule out toxicity)." },
+  { id: "s2_supplements", step: 2, label: "Supplement Consolidation",
+    detail: "Consolidate or eliminate non-essential supplements to address high-pill-burden configurations." },
+  // Step 3 — Dietary & Nursing Interventions
+  { id: "s3_weight", step: 3, label: "Weight & Fluid Monitoring",
+    detail: "Implement weekly weights × 4 weeks, then monthly once stable. Record food and fluid intake records × 7 days." },
+  { id: "s3_food", step: 3, label: "Food Enhancement",
+    detail: "Provide nutrient-dense options (e.g., add real butter, cream, or gravy to meals; offer full-fat dairy/whole milk instead of skim)." },
+  { id: "s3_dining", step: 3, label: "Dining Environment",
+    detail: "Provide feeding assistance or verbal cueing during meals. Serve meals in a calm, socially engaging dining environment. Encourage small, frequent finger foods and snacks between meals." },
+  // Step 4 — Pharmacological Appetite Stimulation
+  { id: "s4_mirtazapine", step: 4, label: "mirtazapine (Remeron) 7.5 mg PO at bedtime",
+    detail: "Blocks 5-HT2/3 receptors to induce weight gain, stimulate appetite, and improve nocturnal sleep. Titrate to 15 mg if tolerated after 2 weeks." },
+];
+
+const STEP_META = [
+  { step: 1, title: "Diagnostic Workup & Allied Health Consults" },
+  { step: 2, title: "Medication Review & Deprescribing" },
+  { step: 3, title: "Dietary & Nursing Interventions" },
+  { step: 4, title: "Pharmacological Appetite Stimulation (Safe Alternatives)" },
+];
+
+function CarePathwaysView() {
+  const { toast } = useToast();
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+
+  const toggleCheck = (id: string) =>
+    setChecked((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const checkedCount = checked.size;
+  const totalCount = PATHWAY_ORDERS.length;
+
+  const handleCommit = () => {
+    if (checkedCount === 0) {
+      toast({ title: "No orders selected", description: "Select at least one order before committing.", variant: "destructive" });
+      return;
+    }
+    toast({
+      title: "Orders committed",
+      description: "Orders successfully committed to Electronic Medication/Administration Record (eMAR) and Care Directive files.",
+    });
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 py-2">
+      <div>
+        <h2 className="text-xl font-bold text-foreground">📋 Standardized Care Pathways (Order Sets)</h2>
+        <p className="text-sm text-muted-foreground mt-1">Evidence-based, accordion-style order sets for common LTC clinical scenarios</p>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+        {/* Accordion header */}
+        <button
+          onClick={() => setIsExpanded((v) => !v)}
+          className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-muted/20 transition-colors"
+        >
+          <div className="flex-1 min-w-0 pr-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="font-bold text-base text-foreground leading-snug">
+                Unintentional Weight Loss &amp; FTT Diagnostic &amp; Clinical Orders
+              </p>
+              <span className="shrink-0 text-[11px] font-mono bg-muted/60 border border-border/60 text-muted-foreground px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                Form Ref: LTC-FORM-2024 (Rev. 2026)
+              </span>
+            </div>
+            {!isExpanded && checkedCount > 0 && (
+              <p className="text-xs text-primary mt-1.5">{checkedCount} of {totalCount} orders selected</p>
+            )}
+          </div>
+          {isExpanded
+            ? <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" />
+            : <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />}
+        </button>
+
+        {isExpanded && (
+          <div className="px-6 pb-6 space-y-7 border-t border-border/50">
+
+            {/* High-alert banners */}
+            <div className="space-y-3 pt-5">
+              <div className="rounded-xl border-2 border-red-500/60 bg-transparent p-4">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-red-400 mb-2">Clinical Alert</p>
+                <p className="text-sm text-red-300/90 leading-relaxed">
+                  Unintentional weight loss is a major regulatory and quality-of-care metric in LTC. Knee-jerk ordering
+                  of commercial high-protein supplements is often ineffective and can reduce intake of normal meals.
+                  Prioritize identifying reversible causes (dentition, dysphagia, depression, polypharmacy).
+                </p>
+              </div>
+              <div className="rounded-xl bg-red-900/50 border border-red-700/60 p-4">
+                <p className="text-sm font-bold text-red-200 leading-relaxed">
+                  ⚠️ CONTRAINDICATED: Megestrol acetate (Megace) is strongly discouraged by the Beers Criteria in
+                  older adults due to a high risk of deep vein thrombosis (DVT), fluid retention, and increased mortality
+                  with minimal lean muscle mass benefit.
+                </p>
+              </div>
+            </div>
+
+            {/* 4-step order selection */}
+            <div className="space-y-8">
+              {STEP_META.map(({ step, title }) => {
+                const stepOrders = PATHWAY_ORDERS.filter((o) => o.step === step);
+                const stepChecked = stepOrders.filter((o) => checked.has(o.id)).length;
+                return (
+                  <div key={step} className="space-y-3">
+                    {/* Step label row */}
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-xs shrink-0">
+                        {step}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Step {step}</p>
+                        <p className="font-bold text-foreground text-sm leading-snug">{title}</p>
+                      </div>
+                      {stepChecked > 0 && (
+                        <span className="text-xs text-primary font-bold bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
+                          {stepChecked}/{stepOrders.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Step 4 criteria callout */}
+                    {step === 4 && (
+                      <div className="ml-10 bg-amber-950/40 border border-amber-700/40 rounded-lg px-4 py-3">
+                        <p className="text-xs text-amber-300/90 leading-relaxed">
+                          <span className="font-bold text-amber-300">Criteria:</span> Consider only if non-pharmacological
+                          interventions fail, weight loss is severe (&gt;5% in 1 month or &gt;10% in 6 months), and it
+                          aligns with Goals of Care.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Order rows */}
+                    <div className="ml-10 space-y-2">
+                      {stepOrders.map((order) => {
+                        const sel = checked.has(order.id);
+                        return (
+                          <button
+                            key={order.id}
+                            onClick={() => toggleCheck(order.id)}
+                            className={["w-full flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all active:scale-[0.995]",
+                              sel
+                                ? "bg-primary/10 border-primary/50 shadow-sm"
+                                : "bg-muted/20 border-border hover:border-primary/30 hover:bg-muted/40"].join(" ")}
+                          >
+                            <span className={["flex items-center justify-center w-5 h-5 rounded border-2 shrink-0 mt-0.5 transition-all",
+                              sel ? "bg-primary border-primary" : "border-muted-foreground/40"].join(" ")}>
+                              {sel && (
+                                <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                                  <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className={["font-semibold text-sm leading-snug", sel ? "text-foreground" : "text-foreground/80"].join(" ")}>
+                                {order.label}
+                              </p>
+                              <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{order.detail}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Sign & Commit footer */}
+            <div className="flex items-center gap-4 pt-5 border-t border-border/50">
+              <p className="text-sm text-muted-foreground flex-1">
+                {checkedCount > 0
+                  ? `${checkedCount} of ${totalCount} orders selected`
+                  : "Select orders above to commit them"}
+              </p>
+              <button
+                onClick={handleCommit}
+                disabled={checkedCount === 0}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm bg-primary hover:bg-primary/90 text-primary-foreground border-2 border-primary/60 shadow-md shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Sign &amp; Commit Selected Orders
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── NLQ Search View ───────────────────────────────────────────────────────────
 
 function NLQView({ residents }: { residents: ResidentAlertSummary[] }) {
@@ -3676,7 +3889,7 @@ function ClinicalFormsView() {
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
   const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
-  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual" | "forms">("population");
+  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual" | "forms" | "pathways">("population");
   const [overlayResident, setOverlayResident] = useState<ResidentAlertSummary | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -3876,6 +4089,18 @@ export default function PhysicianDashboard() {
             <ClipboardList className="w-4 h-4" />
             Clinical Forms
           </button>
+          <button
+            onClick={() => setView("pathways")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "pathways"
+                ? "bg-amber-700/20 border-amber-500 text-amber-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-amber-500/40",
+            ].join(" ")}
+          >
+            <FileText className="w-4 h-4" />
+            Order Sets
+          </button>
         </div>
       </div>
 
@@ -3886,8 +4111,8 @@ export default function PhysicianDashboard() {
         {view === "nlq" && data && <NLQView residents={data.residents} />}
         {view === "qi" && data && <QIView residents={data.residents} />}
         {view === "virtual" && <VirtualHealthView />}
-        {view === "forms"   && <ClinicalFormsView />}
-
+        {view === "forms"     && <ClinicalFormsView />}
+        {view === "pathways" && <CarePathwaysView />}
 
         {/* Resident Summary Table */}
         {view === "population" && <section className="space-y-3">
