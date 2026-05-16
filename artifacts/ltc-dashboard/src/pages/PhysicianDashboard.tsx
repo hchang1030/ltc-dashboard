@@ -3992,7 +3992,7 @@ export default function PhysicianDashboard() {
 
       {/* View Tabs */}
       <div className="sticky top-[57px] z-20 bg-background border-b border-border px-6 py-3">
-        <div className="max-w-7xl mx-auto flex gap-2">
+        <div className="max-w-7xl mx-auto flex flex-wrap gap-2">
           <button
             onClick={() => setView("population")}
             className={[
