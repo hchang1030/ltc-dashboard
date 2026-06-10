@@ -73,6 +73,7 @@ import {
   Sparkles,
   ChevronUp,
   Check,
+  Copy,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo, Fragment, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -81,6 +82,7 @@ import { PatientOverlay } from "@/components/PatientOverlay";
 import {
   processNLQ, getQIMetrics, getFamilyQuestions, saveFamilyQuestions,
   getMockPRNLaxCount, getMockPRNAntipsychoticCount, getMockFalls,
+  getMockMeds, getMockProfile, getMockVitals, getMockLabs,
 } from "@/data/mockData";
 import type { NLQResult, FamilyQuestion } from "@/data/mockData";
 
@@ -4139,6 +4141,369 @@ function ClinicalFormsView() {
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
+// ── Referrals ─────────────────────────────────────────────────────────────────
+
+const SPECIALIST_POOL = [
+  { specialty: "Geriatric Medicine",    name: "Dr. Sarah Chen",       clinic: "UBC Geriatric Assessment Unit",         fax: "604-822-7941" },
+  { specialty: "Geriatric Medicine",    name: "Dr. Michael Okafor",   clinic: "VGH Geriatrics Outpatient Clinic",      fax: "604-875-4338" },
+  { specialty: "Geriatric Psychiatry",  name: "Dr. Priya Nair",       clinic: "St. Paul's Geriatric Psychiatry",       fax: "604-682-2344" },
+  { specialty: "Geriatric Psychiatry",  name: "Dr. James Whitfield",  clinic: "UBC Neuropsychiatry Program",           fax: "604-822-5652" },
+  { specialty: "Neurology",             name: "Dr. Linda Tran",       clinic: "Vancouver Neurology Associates",        fax: "604-736-8121" },
+  { specialty: "Neurology",             name: "Dr. Robert Patel",     clinic: "UBC Neurology Clinic",                  fax: "604-822-4190" },
+  { specialty: "Cardiology",            name: "Dr. Angela Kim",       clinic: "VGH Cardiology Clinic",                 fax: "604-875-5180" },
+  { specialty: "Cardiology",            name: "Dr. David Rousseau",   clinic: "St. Paul's Heart Centre",               fax: "604-806-8002" },
+  { specialty: "Internal Medicine",     name: "Dr. Fatima Al-Hassan", clinic: "Vancouver Internal Medicine Group",     fax: "604-734-2222" },
+  { specialty: "Internal Medicine",     name: "Dr. Thomas Berg",      clinic: "Lions Gate Internal Medicine Clinic",   fax: "604-984-5770" },
+  { specialty: "Orthopedics",           name: "Dr. Emily Wong",       clinic: "BC Bone & Joint Clinic",                fax: "604-738-5050" },
+  { specialty: "Orthopedics",           name: "Dr. Mark Johansson",   clinic: "Coastal Orthopaedic Group",             fax: "604-736-7746" },
+  { specialty: "Palliative Care",       name: "Dr. Hannah MacLeod",   clinic: "BC Palliative Care Network",            fax: "604-806-9204" },
+  { specialty: "Palliative Care",       name: "Dr. Jonathan Yu",      clinic: "VGH Palliative & Supportive Care",      fax: "604-875-4222" },
+  { specialty: "Urology",               name: "Dr. Carlos Mendez",    clinic: "Vancouver Urology Group",               fax: "604-687-5678" },
+  { specialty: "Urology",               name: "Dr. Nina Shapiro",     clinic: "Pacific Urology Associates",            fax: "604-875-8800" },
+  { specialty: "Dermatology",           name: "Dr. Sophie Martin",    clinic: "Pacific Derm",                          fax: "604-257-1700" },
+  { specialty: "Dermatology",           name: "Dr. Alan Cho",         clinic: "Vancouver Skin & Laser Clinic",         fax: "604-742-3300" },
+  { specialty: "Ophthalmology",         name: "Dr. Kevin Nguyen",     clinic: "Vancouver Eye Clinic",                  fax: "604-736-0822" },
+  { specialty: "Ophthalmology",         name: "Dr. Mei Lin",          clinic: "UBC Eye Care Centre",                   fax: "604-822-7015" },
+  { specialty: "Respirology",           name: "Dr. Omar Hassan",      clinic: "VGH Respirology Division",             fax: "604-875-4122" },
+  { specialty: "Respirology",           name: "Dr. Claire Dubois",    clinic: "BC Lung Clinic",                        fax: "604-806-8731" },
+  { specialty: "Nephrology",            name: "Dr. Ivan Petrov",      clinic: "VGH Renal Program",                     fax: "604-875-5950" },
+  { specialty: "Endocrinology",         name: "Dr. Grace Park",       clinic: "UBC Endocrinology Clinic",              fax: "604-822-7636" },
+  { specialty: "Gastroenterology",      name: "Dr. Samuel Adeyemi",   clinic: "Vancouver GI Associates",              fax: "604-734-9900" },
+] as const;
+
+type Specialist = typeof SPECIALIST_POOL[number];
+
+const SPECIALTIES = [...new Set(SPECIALIST_POOL.map(s => s.specialty))].sort() as string[];
+
+function calcAge(dob: string | null | undefined): string {
+  if (!dob) return "age unknown";
+  const birthDate = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+  return `${age}-year-old`;
+}
+
+function buildReferralLetter(
+  resident: ResidentAlertSummary,
+  specialist: Specialist,
+  reason: string,
+): string {
+  const today = new Date().toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" });
+  const meds = getMockMeds(resident.residentId);
+  const profile = getMockProfile(resident.residentId);
+  const vitals = getMockVitals(resident.residentId);
+  const labs = getMockLabs(resident.residentId);
+  const falls = getMockFalls(resident.residentId);
+  const latestVital = vitals[vitals.length - 1];
+  const latestLab = labs[labs.length - 1];
+
+  const regularMeds = meds.filter(m => !m.prn);
+  const prnMeds = meds.filter(m => m.prn);
+  const allergies = (resident.allergies ?? []).length > 0
+    ? (resident.allergies ?? []).join(", ")
+    : "No known drug allergies";
+
+  const lines: string[] = [
+    `CEDAR GROVE LONG-TERM CARE FACILITY`,
+    `100 Care Lane, Vancouver, BC  V5K 1A1`,
+    `Tel: 604-555-0100  |  Fax: 604-555-0199`,
+    ``,
+    today,
+    ``,
+    `${specialist.name}`,
+    `${specialist.clinic}`,
+    `Fax: ${specialist.fax}`,
+    ``,
+    `Dear ${specialist.name},`,
+    ``,
+    `RE: ${resident.name}${resident.dob ? `, DOB: ${resident.dob}` : ""}${resident.phn ? `, PHN: ${resident.phn}` : ""}`,
+    `Room ${resident.room} — Cedar Grove Long-Term Care`,
+    ``,
+    `Thank you for seeing this ${calcAge(resident.dob)} resident currently residing at our Long-Term Care facility. I am writing to request a ${specialist.specialty} consultation.`,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `REASON FOR REFERRAL`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    reason || "(not specified)",
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `PAST MEDICAL HISTORY`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    profile.pmhx,
+    ...(resident.infectionFlags && resident.infectionFlags.length > 0
+      ? [``, `Active Infection Flags: ${resident.infectionFlags.join(", ")}`]
+      : []),
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `ALLERGIES`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    allergies,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `CURRENT MEDICATIONS`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    ...(regularMeds.length > 0 ? regularMeds.map(m => `  • ${m.name}  ${m.dose}  ${m.route}  [${m.times.join(", ")}]`) : ["  • None documented"]),
+    ...(prnMeds.length > 0 ? [``, `PRN Medications:`, ...prnMeds.map(m => `  • ${m.name}  ${m.dose}  ${m.route}  PRN`)] : []),
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `RECENT VITALS  (${latestVital?.date ?? "—"})`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    latestVital
+      ? `  BP: ${latestVital.sbp}/${latestVital.dbp} mmHg  |  HR: ${latestVital.hr} bpm  |  RR: ${latestVital.rr}/min\n  Temp: ${latestVital.temp} °C  |  O₂ Sat: ${latestVital.o2}%  |  Weight: ${latestVital.weight} kg`
+      : "  Not available",
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `RECENT INVESTIGATIONS  (${latestLab?.date ?? "—"})`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    latestLab
+      ? [
+          latestLab.wbc !== undefined ? `  WBC: ${latestLab.wbc}  Hgb: ${latestLab.hgb}  Plt: ${latestLab.plt}` : null,
+          latestLab.na !== undefined  ? `  Na: ${latestLab.na}  K: ${latestLab.k}  Cr: ${latestLab.cr}  eGFR: ${latestLab.egfr}` : null,
+          latestLab.albumin !== undefined ? `  Albumin: ${latestLab.albumin}  TSH: ${latestLab.tsh}  ALT: ${latestLab.alt}  LDL: ${latestLab.ldl}` : null,
+          latestLab.hba1c !== undefined   ? `  HbA1c: ${latestLab.hba1c}  Glucose: ${latestLab.glucose}` : null,
+          latestLab.inr !== undefined     ? `  INR: ${latestLab.inr}` : null,
+        ].filter(Boolean).join("\n")
+      : "  Not available",
+    ``,
+    ...(falls.length > 0
+      ? [
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+          `FALL HISTORY  (${falls.length} event${falls.length !== 1 ? "s" : ""} on record)`,
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+          ...falls.slice(0, 3).map(f => `  • ${f.date}: ${f.description}`),
+          ``,
+        ]
+      : []),
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `SOCIAL HISTORY`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    profile.sochx,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `GOALS OF CARE & SDM`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `Code Status: ${resident.codeStatus ?? "Not documented"}`,
+    ...(resident.sdmName
+      ? [`SDM: ${resident.sdmName}${resident.sdmRelation ? ` (${resident.sdmRelation})` : ""}${resident.sdmPhone ? `  Tel: ${resident.sdmPhone}` : ""}`]
+      : ["SDM: Not documented"]),
+    ``,
+    `Please do not hesitate to contact our facility with any questions or concerns.`,
+    ``,
+    `Sincerely,`,
+    ``,
+    `Dr. _______________________`,
+    `Attending Physician`,
+    `Cedar Grove Long-Term Care Facility`,
+    `Tel: 604-555-0100  |  Fax: 604-555-0199`,
+  ];
+
+  return lines.join("\n");
+}
+
+function ReferralsView({ residents }: { residents: ResidentAlertSummary[] }) {
+  const { toast } = useToast();
+  const [residentSearch, setResidentSearch] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [specialty, setSpecialty] = useState("");
+  const [specialistIdx, setSpecialistIdx] = useState<number | null>(null);
+  const [reason, setReason] = useState("");
+  const [letter, setLetter] = useState<string | null>(null);
+
+  const resident = residents.find(r => r.residentId === selectedId) ?? null;
+
+  const filteredResidents = useMemo(
+    () => residents.filter(r =>
+      r.name.toLowerCase().includes(residentSearch.toLowerCase()) ||
+      String(r.room).includes(residentSearch)
+    ),
+    [residents, residentSearch],
+  );
+
+  const specialistsForSpecialty = useMemo(
+    () => (specialty ? SPECIALIST_POOL.filter(s => s.specialty === specialty) : []) as Specialist[],
+    [specialty],
+  );
+
+  const specialist = specialistIdx !== null ? specialistsForSpecialty[specialistIdx] : null;
+
+  const canGenerate = resident !== null && specialist !== null && reason.trim().length > 0;
+
+  function handleGenerate() {
+    if (!resident || !specialist) return;
+    setLetter(buildReferralLetter(resident, specialist, reason));
+  }
+
+  async function handleCopy() {
+    if (!letter) return;
+    try {
+      await navigator.clipboard.writeText(letter);
+      toast({ title: "Copied to clipboard", description: "Referral letter ready to paste." });
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold text-foreground">Referrals</h2>
+        <p className="text-sm text-muted-foreground mt-1">Select a patient and specialist, enter the reason, then generate a complete referral letter with chart data auto-populated.</p>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        {/* ── Left: Form ── */}
+        <div className="space-y-4">
+          {/* Patient picker */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Patient</label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setPickerOpen(o => !o)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-left hover:border-primary/50 transition-colors"
+              >
+                <span className={resident ? "text-foreground font-medium" : "text-muted-foreground"}>
+                  {resident ? `${resident.name} — Room ${resident.room}` : "Select a patient…"}
+                </span>
+                <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+              {pickerOpen && (
+                <div className="absolute z-30 mt-1 w-full bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+                  <div className="p-2 border-b border-border">
+                    <div className="flex items-center gap-2 px-2 py-1.5 bg-background rounded-lg">
+                      <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <input
+                        autoFocus
+                        value={residentSearch}
+                        onChange={e => setResidentSearch(e.target.value)}
+                        placeholder="Search by name or room…"
+                        className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto">
+                    {filteredResidents.map(r => (
+                      <button
+                        key={r.residentId}
+                        type="button"
+                        onClick={() => { setSelectedId(r.residentId); setPickerOpen(false); setResidentSearch(""); setLetter(null); }}
+                        className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-muted/50 transition-colors"
+                      >
+                        <span className="text-sm text-foreground font-medium">{r.name}</span>
+                        <span className="text-xs text-muted-foreground">Room {r.room}</span>
+                      </button>
+                    ))}
+                    {filteredResidents.length === 0 && (
+                      <p className="px-4 py-3 text-xs text-muted-foreground">No matches</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Specialty select */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Specialty</label>
+            <div className="relative">
+              <select
+                value={specialty}
+                onChange={e => { setSpecialty(e.target.value); setSpecialistIdx(null); setLetter(null); }}
+                className="w-full appearance-none px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground focus:outline-none focus:border-primary/70 hover:border-primary/50 transition-colors pr-8"
+              >
+                <option value="">Select a specialty…</option>
+                {SPECIALTIES.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Specialist select — auto-filled fax */}
+          {specialty && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Specialist</label>
+              <div className="relative">
+                <select
+                  value={specialistIdx ?? ""}
+                  onChange={e => { setSpecialistIdx(e.target.value === "" ? null : Number(e.target.value)); setLetter(null); }}
+                  className="w-full appearance-none px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground focus:outline-none focus:border-primary/70 hover:border-primary/50 transition-colors pr-8"
+                >
+                  <option value="">Select a specialist…</option>
+                  {specialistsForSpecialty.map((s, i) => (
+                    <option key={s.name} value={i}>{s.name} — {s.clinic}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              </div>
+              {specialist && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-lg border border-border">
+                  <Printer className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground">Fax:</span>
+                  <span className="text-xs font-mono font-bold text-foreground">{specialist.fax}</span>
+                  <span className="mx-1 text-border">|</span>
+                  <span className="text-xs text-muted-foreground truncate">{specialist.clinic}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Reason for referral */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Reason for Referral</label>
+            <textarea
+              value={reason}
+              onChange={e => { setReason(e.target.value); setLetter(null); }}
+              rows={5}
+              placeholder="Describe the clinical concern and specific questions for the consultant…"
+              className="w-full bg-card border border-border rounded-xl p-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/70 resize-none leading-relaxed"
+            />
+          </div>
+
+          <button
+            type="button"
+            disabled={!canGenerate}
+            onClick={handleGenerate}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            <FileText className="w-4 h-4" />
+            Generate Referral Letter
+          </button>
+        </div>
+
+        {/* ── Right: Letter preview ── */}
+        {letter ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Referral Letter Preview</p>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-semibold transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copy to Clipboard
+              </button>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-5 overflow-y-auto max-h-[600px]">
+              <pre className="text-xs text-foreground font-mono leading-relaxed whitespace-pre-wrap break-words">{letter}</pre>
+            </div>
+          </div>
+        ) : (
+          <div className="hidden xl:flex flex-col items-center justify-center h-full min-h-[300px] rounded-xl border border-dashed border-border text-muted-foreground gap-3">
+            <FileText className="w-10 h-10 opacity-20" />
+            <p className="text-sm">Fill in the form and click<br /><span className="font-semibold">Generate Referral Letter</span></p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const USEFUL_LINKS = [
   {
     category: "Clinical Decision Support",
@@ -4255,7 +4620,7 @@ function UsefulLinksView() {
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
   const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
-  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual" | "forms" | "pathways" | "links">("population");
+  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual" | "forms" | "pathways" | "links" | "referrals">("population");
   const [overlayResident, setOverlayResident] = useState<ResidentAlertSummary | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -4468,6 +4833,18 @@ export default function PhysicianDashboard() {
             Order Sets
           </button>
           <button
+            onClick={() => setView("referrals")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "referrals"
+                ? "bg-cyan-700/20 border-cyan-500 text-cyan-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-cyan-500/40",
+            ].join(" ")}
+          >
+            <Send className="w-4 h-4" />
+            Referrals
+          </button>
+          <button
             onClick={() => setView("links")}
             className={[
               "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
@@ -4491,6 +4868,7 @@ export default function PhysicianDashboard() {
         {view === "virtual" && <VirtualHealthView />}
         {view === "forms"     && <ClinicalFormsView />}
         {view === "pathways" && <CarePathwaysView />}
+        {view === "referrals" && data && <ReferralsView residents={data.residents} />}
         {view === "links" && <UsefulLinksView />}
 
         {/* Resident Summary Table */}
