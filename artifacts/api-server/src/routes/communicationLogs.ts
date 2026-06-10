@@ -74,9 +74,12 @@ router.get("/communications", async (req, res): Promise<void> => {
     .innerJoin(residentsTable, eq(communicationLogsTable.residentId, residentsTable.id))
     .orderBy(desc(communicationLogsTable.timestamp));
 
-  const logs = query.data.residentId
+  const rawLogs = query.data.residentId
     ? await baseQuery.where(eq(communicationLogsTable.residentId, query.data.residentId))
     : await baseQuery;
+
+  const VALID_METHODS = new Set(["Fax", "Email", "SMS"]);
+  const logs = rawLogs.filter((l) => VALID_METHODS.has(l.method));
 
   res.json(ListCommunicationsResponse.parse(logs));
 });

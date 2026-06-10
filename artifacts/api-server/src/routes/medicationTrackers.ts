@@ -91,13 +91,8 @@ router.patch("/medication-trackers/:trackerId/confirm", async (req, res): Promis
     return;
   }
 
-  await db.insert(communicationLogsTable).values({
-    residentId: updated.residentId,
-    destinationLabel: "Physician — Taper Confirmation",
-    contactValue: "internal",
-    method: "Internal",
-    noteContent: `Taper confirmed by ${confirmedBy}: ${updated.medicationName} — started ${now.toLocaleDateString()}. Review due ${reviewDueDate.toLocaleDateString()}.`,
-  });
+  // Taper confirmations are internal operational events — not external communications.
+  // They are intentionally not logged to communication_logs (which is for Fax/Email/SMS only).
 
   const [tracker] = await db
     .select(selectTracker)
