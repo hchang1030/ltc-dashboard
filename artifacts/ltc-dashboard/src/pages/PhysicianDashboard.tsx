@@ -4139,10 +4139,123 @@ function ClinicalFormsView() {
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
+const USEFUL_LINKS = [
+  {
+    category: "Clinical Decision Support",
+    color: "indigo",
+    links: [
+      {
+        title: "UpToDate",
+        description: "Evidence-based clinical decision support and drug reference",
+        url: "https://www.uptodate.com/",
+        badge: "Evidence-Based",
+      },
+      {
+        title: "BC Guidelines & Protocols",
+        description: "BC Ministry of Health clinical practice guidelines for primary and community care",
+        url: "https://www2.gov.bc.ca/gov/content/health/practitioner-professional-resources/bc-guidelines",
+        badge: "BC Gov",
+      },
+    ],
+  },
+  {
+    category: "Provincial Resources",
+    color: "teal",
+    links: [
+      {
+        title: "PathwaysBC",
+        description: "Specialist referral and health system navigation resource for BC clinicians",
+        url: "https://pathwaysbc.ca/",
+        badge: "Referrals",
+      },
+      {
+        title: "Special Authority e-Forms",
+        description: "Online BC PharmaCare Special Authority drug coverage requests for prescribers",
+        url: "https://www2.gov.bc.ca/gov/content/health/practitioner-professional-resources/pharmacare/prescribers/special-authority",
+        badge: "PharmaCare",
+      },
+    ],
+  },
+  {
+    category: "Administrative Forms",
+    color: "amber",
+    links: [
+      {
+        title: "Disability Tax Credit Application",
+        description: "Canada Revenue Agency online DTC application — complete Form T2201 for eligible residents",
+        url: "https://www.canada.ca/en/revenue-agency/services/tax/individuals/segments/tax-credits-deductions-persons-disabilities/disability-tax-credit.html",
+        badge: "CRA",
+      },
+    ],
+  },
+] as const;
+
+const COLOR_MAP: Record<string, { section: string; badge: string; card: string; icon: string }> = {
+  indigo: {
+    section: "text-indigo-400",
+    badge: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
+    card: "hover:border-indigo-500/50 hover:bg-indigo-500/5",
+    icon: "text-indigo-400",
+  },
+  teal: {
+    section: "text-teal-400",
+    badge: "bg-teal-500/15 text-teal-300 border-teal-500/30",
+    card: "hover:border-teal-500/50 hover:bg-teal-500/5",
+    icon: "text-teal-400",
+  },
+  amber: {
+    section: "text-amber-400",
+    badge: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    card: "hover:border-amber-500/50 hover:bg-amber-500/5",
+    icon: "text-amber-400",
+  },
+};
+
+function UsefulLinksView() {
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-xl font-bold text-foreground">Useful Links</h2>
+        <p className="text-sm text-muted-foreground mt-1">Quick access to clinical tools, provincial forms, and guidelines. All links open in a new tab.</p>
+      </div>
+      {USEFUL_LINKS.map((section) => {
+        const colors = COLOR_MAP[section.color];
+        return (
+          <div key={section.category} className="space-y-3">
+            <p className={`text-[11px] uppercase tracking-widest font-bold ${colors.section}`}>{section.category}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {section.links.map((link) => (
+                <a
+                  key={link.url}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`group flex items-start gap-4 p-4 rounded-xl bg-card border border-border transition-all ${colors.card}`}
+                >
+                  <div className={`mt-0.5 shrink-0 ${colors.icon}`}>
+                    <ExternalLink className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-foreground group-hover:underline">{link.title}</span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${colors.badge}`}>{link.badge}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{link.description}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PhysicianDashboard() {
   const [time, setTime] = useState(new Date());
   const [selectedResident, setSelectedResident] = useState<ResidentAlertSummary | null>(null);
-  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual" | "forms" | "pathways">("population");
+  const [view, setView] = useState<"population" | "binder" | "directory" | "cpoe" | "nlq" | "qi" | "virtual" | "forms" | "pathways" | "links">("population");
   const [overlayResident, setOverlayResident] = useState<ResidentAlertSummary | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -4354,6 +4467,18 @@ export default function PhysicianDashboard() {
             <FileText className="w-4 h-4" />
             Order Sets
           </button>
+          <button
+            onClick={() => setView("links")}
+            className={[
+              "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all",
+              view === "links"
+                ? "bg-indigo-700/20 border-indigo-500 text-indigo-300 shadow-sm"
+                : "bg-card border-border text-muted-foreground hover:border-indigo-500/40",
+            ].join(" ")}
+          >
+            <ExternalLink className="w-4 h-4" />
+            Useful Links
+          </button>
         </div>
       </div>
 
@@ -4366,6 +4491,7 @@ export default function PhysicianDashboard() {
         {view === "virtual" && <VirtualHealthView />}
         {view === "forms"     && <ClinicalFormsView />}
         {view === "pathways" && <CarePathwaysView />}
+        {view === "links" && <UsefulLinksView />}
 
         {/* Resident Summary Table */}
         {view === "population" && <section className="space-y-3">
