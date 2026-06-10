@@ -4560,7 +4560,7 @@ const USEFUL_LINKS = [
       {
         title: "eCase",
         description: "Long-term care management system — resident records, care plans, and facility documentation",
-        url: "https://www.ecase.com.au/",
+        url: "https://www.dr2dr.ca/login",
         badge: "LTC System",
       },
       {
