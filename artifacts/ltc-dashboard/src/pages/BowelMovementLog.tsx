@@ -4,7 +4,7 @@ import {
   Clock, Star, ChevronRight, ArrowLeft, Search, X,
   Droplets, Zap, Brain, Utensils, AlertOctagon, Activity, Megaphone,
   FileText, MessageCircle, Send, BookOpen,
-  Clipboard, Trash2, Pencil, Check,
+  Clipboard, Trash2, Pencil, Check, Mic, Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PatientOverlay } from "@/components/PatientOverlay";
@@ -612,6 +612,7 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
   const [staffName, setStaffName] = useState("Frontline Staff");
   const [showProgressNote, setShowProgressNote] = useState(false);
   const [progressNote, setProgressNote] = useState("");
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const createBinder = useCreateBinderEntry();
 
   const { data: allTapers = [] } = useListMedicationTrackers(
@@ -727,7 +728,38 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
                 </div>
               )}
               <div className="space-y-2">
-                <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">SBAR Progress Note</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">SBAR Progress Note</p>
+                  <button
+                    type="button"
+                    disabled={isTranscribing}
+                    onClick={async () => {
+                      setIsTranscribing(true);
+                      await new Promise((r) => setTimeout(r, 1600));
+                      const mockNote = [
+                        `S: ${resident.name} in Room ${resident.room} noted with increased restlessness and verbal complaints of discomfort rated 5/10. Last bowel movement documented over 48 hours ago. Resident requesting pain relief.`,
+                        `B: Resident has a known history of chronic constipation and osteoarthritis. Currently on scheduled Colace and PRN Tylenol. No recent falls or acute illness. Cognitive status baseline — oriented to person and place.`,
+                        `A: Presentation consistent with constipation-related discomfort. Vital signs stable at last check. No signs of acute distress or respiratory compromise. Pain appears musculoskeletal in nature.`,
+                        `R: Administer PRN laxative as per care plan. Encourage oral fluids and ambulation to hallway x2. Reassess bowel status and pain level in 4 hours. Notify charge nurse or physician if no BM within 24 hours or pain escalates above 7/10.`,
+                      ].join("\n\n");
+                      setProgressNote((prev) => prev ? `${prev}\n\n${mockNote}` : mockNote);
+                      setIsTranscribing(false);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-[10px] font-semibold"
+                  >
+                    {isTranscribing ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Transcribing…
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-3 h-3" />
+                        Dictate
+                      </>
+                    )}
+                  </button>
+                </div>
                 <textarea
                   value={progressNote}
                   onChange={(e) => setProgressNote(e.target.value)}
