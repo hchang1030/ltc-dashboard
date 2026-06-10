@@ -4553,6 +4553,24 @@ const USEFUL_LINKS = [
       },
     ],
   },
+  {
+    category: "LTC & Consultation Tools",
+    color: "slate",
+    links: [
+      {
+        title: "eCase",
+        description: "Long-term care management system — resident records, care plans, and facility documentation",
+        url: "https://www.ecase.com.au/",
+        badge: "LTC System",
+      },
+      {
+        title: "RACE Line",
+        description: "BC Rapid Access to Consultative Expertise — phone-based specialist consultation for BC physicians (8am–5pm)",
+        url: "https://raceconnect.ca/",
+        badge: "BC Consult",
+      },
+    ],
+  },
 ] as const;
 
 const COLOR_MAP: Record<string, { section: string; badge: string; card: string; icon: string }> = {
@@ -4573,6 +4591,12 @@ const COLOR_MAP: Record<string, { section: string; badge: string; card: string; 
     badge: "bg-amber-500/15 text-amber-300 border-amber-500/30",
     card: "hover:border-amber-500/50 hover:bg-amber-500/5",
     icon: "text-amber-400",
+  },
+  slate: {
+    section: "text-slate-400",
+    badge: "bg-slate-500/15 text-slate-300 border-slate-500/30",
+    card: "hover:border-slate-500/50 hover:bg-slate-500/5",
+    icon: "text-slate-400",
   },
 };
 
