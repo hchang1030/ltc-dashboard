@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "_fBtBdQAMPklN2kh7bK_z"
+uri = "file://ltc-codebase.tar.gz"
+type = "unspecified"
+title = "LTC Dashboard — Source Code"
