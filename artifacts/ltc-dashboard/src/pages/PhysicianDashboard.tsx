@@ -74,7 +74,7 @@ import {
   ChevronUp,
   Check,
 } from "lucide-react";
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { PatientOverlay } from "@/components/PatientOverlay";
@@ -2666,52 +2666,165 @@ function SortTh({ label, sortK, currentKey, currentDir, onSort }: {
 
 // ── Care Pathways View ────────────────────────────────────────────────────────
 
-interface PathwayOrder {
+interface PathwayAlert {
+  variant: "outline-red" | "solid-red" | "solid-amber";
+  title?: string;
+  content: string;
+}
+
+interface PathwayStepMeta {
+  step: number;
+  title: string;
+  criteriaCallout?: string;
+}
+
+interface PathwayOrderItem {
   id: string;
   step: number;
   label: string;
   detail: string;
 }
 
-const PATHWAY_ORDERS: PathwayOrder[] = [
-  // Step 1 — Diagnostic Workup & Allied Health Consults
-  { id: "s1_diagnostics", step: 1, label: "Baseline Diagnostics",
-    detail: "Order CBC, Albumin, TSH, Electrolytes, Creatinine, Calcium, and Fasting Glucose." },
-  { id: "s1_dentition", step: 1, label: "Dentition Check",
-    detail: "Inspect mouth for poorly fitting dentures, severe dental caries, dry mouth (xerostomia), or oral candidiasis (thrush)." },
-  { id: "s1_depression", step: 1, label: "Depression Screening",
-    detail: "Administer the Geriatric Depression Scale (GDS) or PHQ-9 modified for dementia." },
-  { id: "s1_dietitian", step: 1, label: "Consult Dietitian",
-    detail: "Comprehensive nutritional assessment, calorie count, and food preference audit." },
-  { id: "s1_slp", step: 1, label: "Consult Speech-Language Pathology (SLP)",
-    detail: "Swallowing evaluation if signs of dysphagia (coughing/choking during meals) are present." },
-  // Step 2 — Medication Review & Deprescribing
-  { id: "s2_meds", step: 2, label: "Audit Medication Regimen",
-    detail: "Review and taper/discontinue appetite-suppressing medications if clinically safe: Cholinesterase Inhibitors (donepezil, galantamine, rivastigmine), Activating SSRIs (fluoxetine), Topiramate, and chronic Digoxin (rule out toxicity)." },
-  { id: "s2_supplements", step: 2, label: "Supplement Consolidation",
-    detail: "Consolidate or eliminate non-essential supplements to address high-pill-burden configurations." },
-  // Step 3 — Dietary & Nursing Interventions
-  { id: "s3_weight", step: 3, label: "Weight & Fluid Monitoring",
-    detail: "Implement weekly weights × 4 weeks, then monthly once stable. Record food and fluid intake records × 7 days." },
-  { id: "s3_food", step: 3, label: "Food Enhancement",
-    detail: "Provide nutrient-dense options (e.g., add real butter, cream, or gravy to meals; offer full-fat dairy/whole milk instead of skim)." },
-  { id: "s3_dining", step: 3, label: "Dining Environment",
-    detail: "Provide feeding assistance or verbal cueing during meals. Serve meals in a calm, socially engaging dining environment. Encourage small, frequent finger foods and snacks between meals." },
-  // Step 4 — Pharmacological Appetite Stimulation
-  { id: "s4_mirtazapine", step: 4, label: "mirtazapine (Remeron) 7.5 mg PO at bedtime",
-    detail: "Blocks 5-HT2/3 receptors to induce weight gain, stimulate appetite, and improve nocturnal sleep. Titrate to 15 mg if tolerated after 2 weeks." },
+interface Pathway {
+  id: string;
+  title: string;
+  formRef: string;
+  alerts: PathwayAlert[];
+  steps: PathwayStepMeta[];
+  orders: PathwayOrderItem[];
+}
+
+const ALL_PATHWAYS: Pathway[] = [
+  {
+    id: "weight-loss",
+    title: "Unintentional Weight Loss & FTT Diagnostic & Clinical Orders",
+    formRef: "LTC-FORM-2024 (Rev. 2026)",
+    alerts: [
+      { variant: "outline-red", title: "Clinical Alert", content: "Unintentional weight loss is a major regulatory and quality-of-care metric in LTC. Knee-jerk ordering of commercial high-protein supplements is often ineffective and can reduce intake of normal meals. Prioritize identifying reversible causes (dentition, dysphagia, depression, polypharmacy)." },
+      { variant: "solid-red", content: "⚠️ CONTRAINDICATED: Megestrol acetate (Megace) is strongly discouraged by the Beers Criteria in older adults due to a high risk of deep vein thrombosis (DVT), fluid retention, and increased mortality with minimal lean muscle mass benefit." },
+    ],
+    steps: [
+      { step: 1, title: "Diagnostic Workup & Allied Health Consults" },
+      { step: 2, title: "Medication Review & Deprescribing" },
+      { step: 3, title: "Dietary & Nursing Interventions" },
+      { step: 4, title: "Pharmacological Appetite Stimulation (Safe Alternatives)", criteriaCallout: "Consider only if non-pharmacological interventions fail, weight loss is severe (>5% in 1 month or >10% in 6 months), and it aligns with Goals of Care." },
+    ],
+    orders: [
+      { id: "wl-s1-dx",     step: 1, label: "Baseline Diagnostics",                        detail: "Order CBC, Albumin, TSH, Electrolytes, Creatinine, Calcium, and Fasting Glucose." },
+      { id: "wl-s1-dent",   step: 1, label: "Dentition Check",                             detail: "Inspect mouth for poorly fitting dentures, severe dental caries, dry mouth (xerostomia), or oral candidiasis (thrush)." },
+      { id: "wl-s1-dep",    step: 1, label: "Depression Screening",                        detail: "Administer the Geriatric Depression Scale (GDS) or PHQ-9 modified for dementia." },
+      { id: "wl-s1-diet",   step: 1, label: "Consult Dietitian",                           detail: "Comprehensive nutritional assessment, calorie count, and food preference audit." },
+      { id: "wl-s1-slp",    step: 1, label: "Consult Speech-Language Pathology (SLP)",     detail: "Swallowing evaluation if signs of dysphagia (coughing/choking during meals) are present." },
+      { id: "wl-s2-meds",   step: 2, label: "Audit Medication Regimen",                    detail: "Review and taper/discontinue appetite-suppressing medications if clinically safe: Cholinesterase Inhibitors (donepezil, galantamine, rivastigmine), Activating SSRIs (fluoxetine), Topiramate, and chronic Digoxin (rule out toxicity)." },
+      { id: "wl-s2-supp",   step: 2, label: "Supplement Consolidation",                    detail: "Consolidate or eliminate non-essential supplements to address high-pill-burden configurations." },
+      { id: "wl-s3-wt",     step: 3, label: "Weight & Fluid Monitoring",                   detail: "Implement weekly weights × 4 weeks, then monthly once stable. Record food and fluid intake records × 7 days." },
+      { id: "wl-s3-food",   step: 3, label: "Food Enhancement",                            detail: "Provide nutrient-dense options (e.g., add real butter, cream, or gravy to meals; offer full-fat dairy/whole milk instead of skim)." },
+      { id: "wl-s3-dining", step: 3, label: "Dining Environment",                          detail: "Provide feeding assistance or verbal cueing during meals. Serve meals in a calm, socially engaging dining environment. Encourage small, frequent finger foods and snacks between meals." },
+      { id: "wl-s4-mirt",   step: 4, label: "mirtazapine (Remeron) 7.5 mg PO at bedtime", detail: "Blocks 5-HT2/3 receptors to induce weight gain, stimulate appetite, and improve nocturnal sleep. Titrate to 15 mg if tolerated after 2 weeks." },
+    ],
+  },
+  {
+    id: "pneumonia",
+    title: "Pneumonia (CAP / Aspiration) — Diagnosis & Treatment Orders",
+    formRef: "LTC-FORM-2025-PNA (Rev. 2026)",
+    alerts: [
+      { variant: "outline-red", title: "Clinical Alert", content: "Aspiration is the most common cause of pneumonia in LTC residents. Always assess swallowing safety and implement dysphagia precautions. Positioning modifications and thickened fluids may be as important as antibiotics. Review Goals of Care before initiating IV antibiotics or hospital transfer." },
+      { variant: "solid-red", content: "⚠️ HIGH-RISK: Fluoroquinolone antibiotics (levofloxacin, ciprofloxacin) are associated with C. difficile colitis, tendon rupture, QT prolongation, and CNS effects (delirium, confusion) in older adults. Reserve for documented penicillin allergy or confirmed treatment failure." },
+    ],
+    steps: [
+      { step: 1, title: "Diagnostic Assessment" },
+      { step: 2, title: "Hospitalization vs. In-Facility Treatment Decision", criteriaCallout: "CURB-65: Confusion, Urea >7 mmol/L, RR ≥30, BP <90/60, Age ≥65. Score 0–1: treat in facility. Score 2: consider hospital. Score 3+: hospital transfer. Always weigh against Goals of Care." },
+      { step: 3, title: "Empiric Antibiotic Therapy (In-Facility)" },
+      { step: 4, title: "Supportive Care & Monitoring" },
+    ],
+    orders: [
+      { id: "pna-s1-cxr",      step: 1, label: "Chest X-Ray",                                                                          detail: "Order portable CXR if resident is immobile. Clinical diagnosis is acceptable when CXR is not feasible." },
+      { id: "pna-s1-labs",     step: 1, label: "Baseline Bloodwork",                                                                   detail: "CBC, CRP, Creatinine, Electrolytes, Blood Glucose. Blood Cultures × 2 if sepsis criteria met." },
+      { id: "pna-s1-sputum",   step: 1, label: "Sputum Culture",                                                                       detail: "Send sputum culture BEFORE antibiotics if resident has productive cough and can cooperate. Document clinical indication on requisition." },
+      { id: "pna-s1-o2",       step: 1, label: "Pulse Oximetry — Baseline",                                                            detail: "Document baseline SpO2. Target ≥92% on supplemental O2 (or per Goals of Care)." },
+      { id: "pna-s2-goc",      step: 2, label: "Review Goals of Care",                                                                 detail: "Confirm hospitalization aligns with stated Goals of Care before transfer. Document SDM discussion if care direction changed." },
+      { id: "pna-s3-abx1",     step: 3, label: "Mild-moderate CAP (no recent antibiotics): amoxicillin-clavulanate 875/125 mg PO BID × 5–7 days", detail: "First-line for CAP in LTC without recent antibiotic exposure." },
+      { id: "pna-s3-abx2",     step: 3, label: "Moderate CAP (recent antibiotics): levofloxacin 750 mg PO daily × 5 days",            detail: "Use only if recent beta-lactam failure or allergy. Monitor for QTc prolongation and delirium." },
+      { id: "pna-s3-asp",      step: 3, label: "Aspiration pneumonia: amoxicillin-clavulanate 875/125 mg PO BID × 7 days",             detail: "Provides anaerobic coverage. Extend duration to 7 days given aspiration source." },
+      { id: "pna-s3-allergy",  step: 3, label: "Severe penicillin allergy: azithromycin 500 mg PO daily × 5 days",                     detail: "If fluoroquinolone also contraindicated. Document allergy clearly. Monitor QTc." },
+      { id: "pna-s4-o2tx",     step: 4, label: "O2 Supplementation",                                                                  detail: "Maintain SpO2 ≥92% via nasal prongs or face mask. Reassess need daily." },
+      { id: "pna-s4-fluids",   step: 4, label: "Oral Hydration / IV Fluids",                                                          detail: "Encourage oral fluids. Consider IV or hypodermoclysis if oral intake critically poor and consistent with Goals of Care." },
+      { id: "pna-s4-apap",     step: 4, label: "Acetaminophen 650 mg PO/PR q4–6h PRN (fever / discomfort)",                           detail: "Avoid NSAIDs in older adults. Max 3 g/day in LTC setting." },
+      { id: "pna-s4-repo",     step: 4, label: "Repositioning & Aspiration Precautions",                                              detail: "Reposition every 2h. Elevate head of bed ≥30°. Notify SLP if aspiration suspected." },
+      { id: "pna-s4-reassess", step: 4, label: "72-Hour Clinical Reassessment",                                                       detail: "If no improvement by 72h, reassess diagnosis, antibiotic choice, and need for hospital transfer." },
+    ],
+  },
+  {
+    id: "eol",
+    title: "End of Life / Palliative Comfort Care Orders",
+    formRef: "LTC-FORM-2023-EOL (Rev. 2026)",
+    alerts: [
+      { variant: "outline-red", title: "Care Philosophy", content: "Once comfort-focused care is documented, every intervention must be evaluated: 'Does this contribute to the resident's comfort?' If the answer is no, it should be discontinued — regardless of prior routine practice, regulatory defaults, or family expectation. The goal is comfort, dignity, and symptom relief." },
+      { variant: "solid-red", content: "⚠️ Opioid dosing at end of life is titrated to symptom relief, not a fixed dose ceiling. The ethical principle of double effect permits symptom-controlling doses even if they may incidentally hasten death. Document clinical indication (pain, dyspnea) for every dose ordered." },
+    ],
+    steps: [
+      { step: 1, title: "Goals of Care & SDM Consent" },
+      { step: 2, title: "Comfort Medication Orders (Anticipatory Prescribing)" },
+      { step: 3, title: "Discontinue Non-Comfort Interventions" },
+      { step: 4, title: "Family, Spiritual & Bereavement Care" },
+    ],
+    orders: [
+      { id: "eol-s1-goc",    step: 1, label: "Goals of Care Conversation — Document in Chart",                    detail: "Initiate or confirm Goals of Care discussion with SDM/family. Document code status, hospitalization preference, and care direction clearly." },
+      { id: "eol-s1-dnr",    step: 1, label: "Code Status: DNR / DNI / Comfort Care Only",                       detail: "Complete Code Status documentation per provincial/territorial form. Ensure copy is accessible to all care staff and on-call coverage." },
+      { id: "eol-s1-acp",    step: 1, label: "Advance Care Planning Documentation",                              detail: "Confirm or complete Advance Directive / Personal Directive. Document SDM name, relationship, and contact information." },
+      { id: "eol-s1-notify", step: 1, label: "Notify Family of Transition to Palliative Care",                   detail: "Document family notification, understanding, and any questions raised. Offer in-person or video family meeting with care team." },
+      { id: "eol-s2-morph",  step: 2, label: "morphine 2.5 mg SC/SL q4h PRN — pain or dyspnea",                 detail: "Starting dose for opioid-naïve residents. Titrate by 25–50% if inadequate relief after 24h." },
+      { id: "eol-s2-btx",    step: 2, label: "morphine 1–2.5 mg SC q1h PRN — breakthrough",                     detail: "Breakthrough dose = 10–15% of 24h total opioid dose. Assess response within 30 minutes." },
+      { id: "eol-s2-midaz",  step: 2, label: "midazolam 2.5 mg SC q4h PRN — anxiety / terminal restlessness",   detail: "For refractory agitation or terminal restlessness not responsive to repositioning or verbal reassurance." },
+      { id: "eol-s2-haldo",  step: 2, label: "haloperidol 0.5–1 mg SC q4–6h PRN — nausea / delirium",           detail: "For nausea or hyperactive delirium. Avoid in Lewy body dementia." },
+      { id: "eol-s2-glyco",  step: 2, label: "glycopyrrolate 0.2 mg SC q4h PRN — secretions (death rattle)",    detail: "For noisy breathing from pooled oropharyngeal secretions. Resident is typically unconscious — primarily for family comfort." },
+      { id: "eol-s2-apap",   step: 2, label: "Acetaminophen 650 mg PR/SL q6h PRN — pain / fever",               detail: "When oral route is lost. Maintain for baseline comfort even in unconscious residents." },
+      { id: "eol-s3-meds",   step: 3, label: "Discontinue Non-Comfort Medications",                             detail: "Stop: statins, antihypertensives, vitamins/supplements, diabetes agents (unless hypoglycemia risk), anticoagulants, dementia medications, bisphosphonates." },
+      { id: "eol-s3-vitals", step: 3, label: "Discontinue Routine Vital Signs",                                  detail: "Replace scheduled VS monitoring with comfort-focused assessment: breathing pattern, pain indicators, consciousness level." },
+      { id: "eol-s3-labs",   step: 3, label: "Discontinue Routine Lab Draws",                                    detail: "Cancel all pending and recurring lab orders unless a result would directly change a comfort measure." },
+      { id: "eol-s3-fluids", step: 3, label: "Discontinue IV Fluids / Enteral Nutrition",                        detail: "Unless oral/IV fluids demonstrably relieve symptoms (e.g., thirst, dry mouth). Document rationale if continuing." },
+      { id: "eol-s3-o2",     step: 3, label: "Reassess O2 Supplementation",                                     detail: "Discontinue supplemental O2 unless resident reports subjective relief of dyspnea. SpO2 is not a comfort target at end of life." },
+      { id: "eol-s4-chap",   step: 4, label: "Chaplain / Spiritual Care Referral",                              detail: "Contact chaplain per resident and family wishes. Document spiritual care preferences in chart." },
+      { id: "eol-s4-pkg",    step: 4, label: "Provide Family Palliative Care Information Package",               detail: "Includes: what to expect in final days, role of comfort medications, facility bereavement resources, and after-death procedures." },
+      { id: "eol-s4-brvmt",  step: 4, label: "Arrange Bereavement Follow-Up",                                   detail: "Schedule bereavement contact with family at 2–4 weeks post-death. Document support offered." },
+      { id: "eol-s4-brief",  step: 4, label: "Brief All Care Staff on Comfort-Only Plan",                       detail: "Ensure all nursing and care aide staff are aware of comfort-focused care plan. Provide handoff to on-call coverage." },
+    ],
+  },
+  {
+    id: "uti",
+    title: "UTI Diagnosis (McGeer Criteria) & Antibiotic Treatment Orders",
+    formRef: "LTC-FORM-2025-UTI (Rev. 2026)",
+    alerts: [
+      { variant: "outline-red", title: "Antibiotic Stewardship Alert", content: "Asymptomatic bacteriuria (ASB) — a positive urine culture without symptoms — must NOT be treated with antibiotics. This is the single most common driver of inappropriate antibiotic use in LTC and directly contributes to Clostridioides difficile, antibiotic resistance, and drug-related adverse events. Treat the patient, not the culture result." },
+      { variant: "solid-amber", content: "⚠️ Stewardship note: Nitrofurantoin is contraindicated when eGFR < 30 mL/min/1.73m² (common in LTC). Fluoroquinolones should be reserved for documented allergy or culture-confirmed resistance. Cloudy or malodorous urine alone does NOT meet McGeer Criteria." },
+    ],
+    steps: [
+      { step: 1, title: "Diagnosis — Apply McGeer Criteria (Minimum Criteria Required)" },
+      { step: 2, title: "Urine Culture — Before Antibiotics" },
+      { step: 3, title: "Empiric Antibiotic Selection (Pending Culture)" },
+      { step: 4, title: "Monitoring, De-escalation & Stewardship Review" },
+    ],
+    orders: [
+      { id: "uti-s1-nocath",  step: 1, label: "Non-Catheterized Resident — McGeer Criteria (≥3 required)",                      detail: "Fever >38°C or temp change >1.5°C from baseline; new/worsened urinary urgency, frequency, or incontinence; new flank or suprapubic pain; gross hematuria; rigors; or new-onset delirium with no other identifiable cause." },
+      { id: "uti-s1-cath",    step: 1, label: "Catheterized Resident — McGeer Criteria (≥2 required)",                         detail: "Fever >38°C; new flank or suprapubic pain/tenderness; rigors; or new-onset delirium with no other identifiable cause. Replace catheter before starting antibiotics." },
+      { id: "uti-s1-not-dx",  step: 1, label: "Document: Symptoms Ruling OUT Diagnosis",                                       detail: "Malodorous urine, cloudy urine, or colour change ALONE do NOT meet McGeer Criteria and must NOT trigger antibiotic treatment. Document this negative assessment in the chart." },
+      { id: "uti-s2-culture", step: 2, label: "Midstream Urine (MSU) or Catheter Specimen for Culture + Sensitivity",          detail: "Send BEFORE starting antibiotics. Include clinical indication (McGeer criteria met) on requisition. Do not send culture for asymptomatic residents." },
+      { id: "uti-s2-cath-cx", step: 2, label: "Catheter Replacement (Catheterized Residents)",                                 detail: "Replace indwelling catheter before collecting culture specimen and before starting antibiotics." },
+      { id: "uti-s3-nitro",   step: 3, label: "Uncomplicated UTI (no systemic signs): nitrofurantoin monohydrate 100 mg PO BID × 5–7 days", detail: "First-line. CONTRAINDICATED if eGFR < 30 mL/min/1.73m². Do not use for pyelonephritis (poor tissue penetration)." },
+      { id: "uti-s3-tmp",     step: 3, label: "Complicated UTI / systemic signs: TMP-SMX DS 1 tab PO BID × 7 days",           detail: "Trimethoprim-sulfamethoxazole. Check local resistance rates. Contraindicated with sulfonamide allergy or eGFR < 15." },
+      { id: "uti-s3-cipro",   step: 3, label: "Complicated UTI / TMP-SMX allergy: ciprofloxacin 250–500 mg PO BID × 7 days",  detail: "Reserve for allergy or culture-confirmed TMP-SMX resistance. Monitor for CNS effects (delirium) and QTc prolongation." },
+      { id: "uti-s3-cauti",   step: 3, label: "Catheter-Associated UTI: 7–14 day course (per clinical response)",              detail: "Replace catheter before starting antibiotics. Adjust to narrowest effective agent per culture sensitivity." },
+      { id: "uti-s4-48h",     step: 4, label: "48–72h Reassessment",                                                          detail: "If no clinical improvement, reassess diagnosis, broaden coverage, or consider transfer. If improving, continue current course." },
+      { id: "uti-s4-deesc",   step: 4, label: "De-escalate Antibiotic to Culture Sensitivity",                                 detail: "When C&S returns, narrow to shortest-course, most targeted antibiotic per sensitivity. Document in MAR with expected end date." },
+      { id: "uti-s4-doc",     step: 4, label: "Document Antibiotic Indication, Start Date & Stop Date",                       detail: "Required for antibiotic stewardship audit. Include McGeer criteria met, culture result, and antibiotic end date in the chart." },
+      { id: "uti-s4-cath",    step: 4, label: "Reassess Catheter Necessity",                                                   detail: "Remove indwelling catheter if no longer clinically indicated. Each day of catheterization increases infection risk by 3–10%." },
+    ],
+  },
 ];
 
-const STEP_META = [
-  { step: 1, title: "Diagnostic Workup & Allied Health Consults" },
-  { step: 2, title: "Medication Review & Deprescribing" },
-  { step: 3, title: "Dietary & Nursing Interventions" },
-  { step: 4, title: "Pharmacological Appetite Stimulation (Safe Alternatives)" },
-];
-
-function CarePathwaysView() {
+function PathwayCard({ pathway }: { pathway: Pathway }) {
   const { toast } = useToast();
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [committedText, setCommittedText] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -2720,7 +2833,7 @@ function CarePathwaysView() {
     setChecked((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const checkedCount = checked.size;
-  const totalCount = PATHWAY_ORDERS.length;
+  const totalCount = pathway.orders.length;
 
   const handleCommit = () => {
     if (checkedCount === 0) {
@@ -2730,16 +2843,16 @@ function CarePathwaysView() {
     const now = new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
     const lines: string[] = [
       "STANDARDIZED CARE PATHWAY ORDERS",
-      "Unintentional Weight Loss & FTT Diagnostic & Clinical Orders",
-      `Form Ref: LTC-FORM-2024 (Rev. 2026) — Signed ${now}`,
+      pathway.title,
+      `Form Ref: ${pathway.formRef} — Signed ${now}`,
       "",
     ];
-    STEP_META.forEach(({ step, title }) => {
-      const stepOrders = PATHWAY_ORDERS.filter((o) => o.step === step && checked.has(o.id));
+    pathway.steps.forEach(({ step, title }) => {
+      const stepOrders = pathway.orders.filter((o) => o.step === step && checked.has(o.id));
       if (stepOrders.length === 0) return;
       lines.push(`STEP ${step}: ${title.toUpperCase()}`);
-      stepOrders.forEach((o, i) => {
-        lines.push(`  ${i + 1}. ${o.label}`);
+      stepOrders.forEach((o, idx) => {
+        lines.push(`  ${idx + 1}. ${o.label}`);
         lines.push(`     ${o.detail}`);
       });
       lines.push("");
@@ -2750,10 +2863,7 @@ function CarePathwaysView() {
     setCommittedText(text);
     setCopied(false);
     navigator.clipboard.writeText(text).catch(() => {});
-    toast({
-      title: "Orders committed",
-      description: "Orders committed to eMAR. Formatted summary ready to copy below.",
-    });
+    toast({ title: "Orders committed", description: "Orders committed to eMAR. Formatted summary ready to copy below." });
   };
 
   const handleCopyText = () => {
@@ -2764,152 +2874,136 @@ function CarePathwaysView() {
     });
   };
 
+  const alertContainerClass = (v: PathwayAlert["variant"]) =>
+    v === "outline-red" ? "rounded-xl border-2 border-red-500/60 bg-transparent p-4"
+    : v === "solid-red"  ? "rounded-xl bg-red-900/50 border border-red-700/60 p-4"
+    :                      "rounded-xl bg-amber-950/40 border border-amber-700/50 p-4";
+
+  const alertTextClass = (v: PathwayAlert["variant"]) =>
+    v === "outline-red" ? "text-sm text-red-300/90 leading-relaxed"
+    : v === "solid-red"  ? "text-sm font-bold text-red-200 leading-relaxed"
+    :                      "text-sm font-bold text-amber-300/90 leading-relaxed";
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6 py-2">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">📋 Standardized Care Pathways (Order Sets)</h2>
-        <p className="text-sm text-muted-foreground mt-1">Evidence-based, accordion-style order sets for common LTC clinical scenarios</p>
-      </div>
-
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-        {/* Accordion header */}
-        <button
-          onClick={() => setIsExpanded((v) => !v)}
-          className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-muted/20 transition-colors"
-        >
-          <div className="flex-1 min-w-0 pr-4">
-            <div className="flex items-center gap-3 flex-wrap">
-              <p className="font-bold text-base text-foreground leading-snug">
-                Unintentional Weight Loss &amp; FTT Diagnostic &amp; Clinical Orders
-              </p>
-              <span className="shrink-0 text-[11px] font-mono bg-muted/60 border border-border/60 text-muted-foreground px-2.5 py-0.5 rounded-full whitespace-nowrap">
-                Form Ref: LTC-FORM-2024 (Rev. 2026)
-              </span>
-            </div>
-            {!isExpanded && checkedCount > 0 && (
-              <p className="text-xs text-primary mt-1.5">{checkedCount} of {totalCount} orders selected</p>
-            )}
+    <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+      {/* Accordion header */}
+      <button
+        onClick={() => setIsExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-muted/20 transition-colors"
+      >
+        <div className="flex-1 min-w-0 pr-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <p className="font-bold text-base text-foreground leading-snug">{pathway.title}</p>
+            <span className="shrink-0 text-[11px] font-mono bg-muted/60 border border-border/60 text-muted-foreground px-2.5 py-0.5 rounded-full whitespace-nowrap">
+              Form Ref: {pathway.formRef}
+            </span>
           </div>
-          {isExpanded
-            ? <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" />
-            : <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />}
-        </button>
+          {!isExpanded && checkedCount > 0 && (
+            <p className="text-xs text-primary mt-1.5">{checkedCount} of {totalCount} orders selected</p>
+          )}
+        </div>
+        {isExpanded
+          ? <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" />
+          : <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />}
+      </button>
 
-        {isExpanded && (
-          <div className="px-6 pb-6 space-y-7 border-t border-border/50">
-
-            {/* High-alert banners */}
-            <div className="space-y-3 pt-5">
-              <div className="rounded-xl border-2 border-red-500/60 bg-transparent p-4">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-red-400 mb-2">Clinical Alert</p>
-                <p className="text-sm text-red-300/90 leading-relaxed">
-                  Unintentional weight loss is a major regulatory and quality-of-care metric in LTC. Knee-jerk ordering
-                  of commercial high-protein supplements is often ineffective and can reduce intake of normal meals.
-                  Prioritize identifying reversible causes (dentition, dysphagia, depression, polypharmacy).
-                </p>
+      {isExpanded && (
+        <div className="px-6 pb-6 space-y-7 border-t border-border/50">
+          {/* Alert banners */}
+          <div className="space-y-3 pt-5">
+            {pathway.alerts.map((alert, ai) => (
+              <div key={ai} className={alertContainerClass(alert.variant)}>
+                {alert.title && (
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-red-400 mb-2">{alert.title}</p>
+                )}
+                <p className={alertTextClass(alert.variant)}>{alert.content}</p>
               </div>
-              <div className="rounded-xl bg-red-900/50 border border-red-700/60 p-4">
-                <p className="text-sm font-bold text-red-200 leading-relaxed">
-                  ⚠️ CONTRAINDICATED: Megestrol acetate (Megace) is strongly discouraged by the Beers Criteria in
-                  older adults due to a high risk of deep vein thrombosis (DVT), fluid retention, and increased mortality
-                  with minimal lean muscle mass benefit.
-                </p>
-              </div>
-            </div>
+            ))}
+          </div>
 
-            {/* 4-step order selection */}
-            <div className="space-y-8">
-              {STEP_META.map(({ step, title }) => {
-                const stepOrders = PATHWAY_ORDERS.filter((o) => o.step === step);
-                const stepChecked = stepOrders.filter((o) => checked.has(o.id)).length;
-                return (
-                  <div key={step} className="space-y-3">
-                    {/* Step label row */}
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-xs shrink-0">
-                        {step}
+          {/* Steps */}
+          <div className="space-y-8">
+            {pathway.steps.map(({ step, title, criteriaCallout }) => {
+              const stepOrders = pathway.orders.filter((o) => o.step === step);
+              const stepChecked = stepOrders.filter((o) => checked.has(o.id)).length;
+              return (
+                <div key={step} className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-xs shrink-0">
+                      {step}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Step {step}</p>
+                      <p className="font-bold text-foreground text-sm leading-snug">{title}</p>
+                    </div>
+                    {stepChecked > 0 && (
+                      <span className="text-xs text-primary font-bold bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
+                        {stepChecked}/{stepOrders.length}
                       </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Step {step}</p>
-                        <p className="font-bold text-foreground text-sm leading-snug">{title}</p>
-                      </div>
-                      {stepChecked > 0 && (
-                        <span className="text-xs text-primary font-bold bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full shrink-0">
-                          {stepChecked}/{stepOrders.length}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Step 4 criteria callout */}
-                    {step === 4 && (
-                      <div className="ml-10 bg-amber-950/40 border border-amber-700/40 rounded-lg px-4 py-3">
-                        <p className="text-xs text-amber-300/90 leading-relaxed">
-                          <span className="font-bold text-amber-300">Criteria:</span> Consider only if non-pharmacological
-                          interventions fail, weight loss is severe (&gt;5% in 1 month or &gt;10% in 6 months), and it
-                          aligns with Goals of Care.
-                        </p>
-                      </div>
                     )}
-
-                    {/* Order rows */}
-                    <div className="ml-10 space-y-2">
-                      {stepOrders.map((order) => {
-                        const sel = checked.has(order.id);
-                        return (
-                          <button
-                            key={order.id}
-                            onClick={() => toggleCheck(order.id)}
-                            className={["w-full flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all active:scale-[0.995]",
-                              sel
-                                ? "bg-primary/10 border-primary/50 shadow-sm"
-                                : "bg-muted/20 border-border hover:border-primary/30 hover:bg-muted/40"].join(" ")}
-                          >
-                            <span className={["flex items-center justify-center w-5 h-5 rounded border-2 shrink-0 mt-0.5 transition-all",
-                              sel ? "bg-primary border-primary" : "border-muted-foreground/40"].join(" ")}>
-                              {sel && (
-                                <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
-                                  <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className={["font-semibold text-sm leading-snug", sel ? "text-foreground" : "text-foreground/80"].join(" ")}>
-                                {order.label}
-                              </p>
-                              <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{order.detail}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
                   </div>
-                );
-              })}
-            </div>
 
-            {/* Sign & Commit footer */}
-            <div className="flex items-center gap-4 pt-5 border-t border-border/50">
-              <p className="text-sm text-muted-foreground flex-1">
-                {checkedCount > 0
-                  ? `${checkedCount} of ${totalCount} orders selected`
-                  : "Select orders above to commit them"}
-              </p>
-              <button
-                onClick={handleCommit}
-                disabled={checkedCount === 0}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm bg-primary hover:bg-primary/90 text-primary-foreground border-2 border-primary/60 shadow-md shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                Sign &amp; Commit Selected Orders
-              </button>
-            </div>
+                  {criteriaCallout && (
+                    <div className="ml-10 bg-amber-950/40 border border-amber-700/40 rounded-lg px-4 py-3">
+                      <p className="text-xs text-amber-300/90 leading-relaxed">
+                        <span className="font-bold text-amber-300">Criteria: </span>{criteriaCallout}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="ml-10 space-y-2">
+                    {stepOrders.map((order) => {
+                      const sel = checked.has(order.id);
+                      return (
+                        <button
+                          key={order.id}
+                          onClick={() => toggleCheck(order.id)}
+                          className={["w-full flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all active:scale-[0.995]",
+                            sel ? "bg-primary/10 border-primary/50 shadow-sm" : "bg-muted/20 border-border hover:border-primary/30 hover:bg-muted/40"].join(" ")}
+                        >
+                          <span className={["flex items-center justify-center w-5 h-5 rounded border-2 shrink-0 mt-0.5 transition-all",
+                            sel ? "bg-primary border-primary" : "border-muted-foreground/40"].join(" ")}>
+                            {sel && (
+                              <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className={["font-semibold text-sm leading-snug", sel ? "text-foreground" : "text-foreground/80"].join(" ")}>
+                              {order.label}
+                            </p>
+                            <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{order.detail}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        )}
-      </div>
 
-      {/* Copy-paste output box — appears after commit */}
+          {/* Sign & Commit footer */}
+          <div className="flex items-center gap-4 pt-5 border-t border-border/50">
+            <p className="text-sm text-muted-foreground flex-1">
+              {checkedCount > 0 ? `${checkedCount} of ${totalCount} orders selected` : "Select orders above to commit them"}
+            </p>
+            <button
+              onClick={handleCommit}
+              disabled={checkedCount === 0}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm bg-primary hover:bg-primary/90 text-primary-foreground border-2 border-primary/60 shadow-md shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Sign &amp; Commit Selected Orders
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Copy-paste output — appears after commit */}
       {committedText && (
-        <div className="rounded-2xl border border-primary/30 bg-card overflow-hidden shadow-sm">
+        <div className="border-t border-primary/20">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
             <div>
               <p className="font-bold text-sm text-foreground">Order Summary — Ready to Paste</p>
@@ -2918,9 +3012,7 @@ function CarePathwaysView() {
             <button
               onClick={handleCopyText}
               className={["flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm border-2 transition-all active:scale-[0.97]",
-                copied
-                  ? "bg-green-700/20 border-green-500 text-green-300"
-                  : "bg-primary/10 border-primary/40 text-primary hover:bg-primary/20"].join(" ")}
+                copied ? "bg-green-700/20 border-green-500 text-green-300" : "bg-primary/10 border-primary/40 text-primary hover:bg-primary/20"].join(" ")}
             >
               {copied ? <Check className="w-4 h-4" /> : <ClipboardList className="w-4 h-4" />}
               {copied ? "Copied!" : "Copy to Clipboard"}
@@ -2935,6 +3027,18 @@ function CarePathwaysView() {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function CarePathwaysView() {
+  return (
+    <div className="max-w-4xl mx-auto space-y-5 py-2">
+      <div>
+        <h2 className="text-xl font-bold text-foreground">📋 Standardized Care Pathways (Order Sets)</h2>
+        <p className="text-sm text-muted-foreground mt-1">Evidence-based order sets for common LTC clinical scenarios — click a pathway to expand</p>
+      </div>
+      {ALL_PATHWAYS.map((p) => <PathwayCard key={p.id} pathway={p} />)}
     </div>
   );
 }
@@ -3057,9 +3161,10 @@ function NLQView({ residents }: { residents: ResidentAlertSummary[] }) {
 
 function QIView({ residents }: { residents: ResidentAlertSummary[] }) {
   const metrics = useMemo(
-    () => getQIMetrics(residents.map(r => r.residentId)),
+    () => getQIMetrics(residents.map(r => ({ residentId: r.residentId, name: r.name, room: r.room }))),
     [residents],
   );
+  const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
 
   const TrendIcon = ({ trend }: { trend: "up" | "down" | "stable" }) => {
     if (trend === "up") return <TrendingUp className="w-4 h-4 text-red-400" />;
@@ -3074,7 +3179,9 @@ function QIView({ residents }: { residents: ResidentAlertSummary[] }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-foreground">Quality Improvement Dashboard</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Real-time facility metrics — {residents.length} residents</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Real-time facility metrics — {residents.length} residents · <span className="text-primary">Click any row</span> to see affected residents
+          </p>
         </div>
         <span className="text-xs font-mono text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border">
           Updated {new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })}
@@ -3096,36 +3203,76 @@ function QIView({ residents }: { residents: ResidentAlertSummary[] }) {
             {metrics.map((m, i) => {
               const pct = residents.length > 0 ? Math.round((m.total / residents.length) * 100) : 0;
               const riskPct = m.total > 0 ? Math.round((m.highRisk / m.total) * 100) : 0;
+              const isOpen = expandedMetric === m.metric;
               return (
-                <tr key={m.metric} className={["border-b border-border/40", i % 2 === 0 ? "" : "bg-muted/10"].join(" ")}>
-                  <td className="px-6 py-4 font-semibold text-foreground">{m.metric}</td>
-                  <td className="px-4 py-4 text-center">
-                    <span className={["text-2xl font-bold", m.total > 0 ? "text-foreground" : "text-muted-foreground"].join(" ")}>{m.total}</span>
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    <span className={["text-lg font-bold", m.highRisk > 3 ? "text-red-400" : m.highRisk > 1 ? "text-amber-400" : "text-emerald-400"].join(" ")}>
-                      {m.highRisk}
-                    </span>
-                    {m.highRisk > 0 && <span className="text-xs text-muted-foreground ml-1">({riskPct}% of affected)</span>}
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className={["h-full rounded-full", pct > 30 ? "bg-red-500" : pct > 15 ? "bg-amber-500" : "bg-emerald-500"].join(" ")}
-                          style={{ width: `${Math.min(pct, 100)}%` }}
-                        />
+                <Fragment key={m.metric}>
+                  <tr
+                    onClick={() => setExpandedMetric(isOpen ? null : m.metric)}
+                    className={["border-b border-border/40 cursor-pointer select-none transition-colors",
+                      isOpen ? "bg-primary/5" : i % 2 === 0 ? "hover:bg-muted/20" : "bg-muted/10 hover:bg-muted/25"].join(" ")}
+                  >
+                    <td className="px-6 py-4 font-semibold text-foreground">
+                      <div className="flex items-center gap-2">
+                        {isOpen
+                          ? <ChevronDown className="w-3.5 h-3.5 text-primary shrink-0" />
+                          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />}
+                        {m.metric}
                       </div>
-                      <span className="text-xs font-mono text-muted-foreground w-8">{pct}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <TrendIcon trend={m.trend} />
-                      <span className="text-xs text-muted-foreground">{trendLabel[m.trend]}</span>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className={["text-2xl font-bold", m.total > 0 ? "text-foreground" : "text-muted-foreground"].join(" ")}>{m.total}</span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className={["text-lg font-bold", m.highRisk > 3 ? "text-red-400" : m.highRisk > 1 ? "text-amber-400" : "text-emerald-400"].join(" ")}>
+                        {m.highRisk}
+                      </span>
+                      {m.highRisk > 0 && <span className="text-xs text-muted-foreground ml-1">({riskPct}%)</span>}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={["h-full rounded-full", pct > 30 ? "bg-red-500" : pct > 15 ? "bg-amber-500" : "bg-emerald-500"].join(" ")}
+                            style={{ width: `${Math.min(pct, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-mono text-muted-foreground w-8">{pct}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <TrendIcon trend={m.trend} />
+                        <span className="text-xs text-muted-foreground">{trendLabel[m.trend]}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr className="bg-primary/5 border-b border-primary/10">
+                      <td colSpan={5} className="px-6 py-4">
+                        {m.residents.length === 0 ? (
+                          <p className="text-sm text-muted-foreground italic">No residents currently flagged for this metric.</p>
+                        ) : (
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-3">
+                              {m.residents.length} resident{m.residents.length !== 1 ? "s" : ""} flagged
+                            </p>
+                            <div className="grid gap-1.5">
+                              {m.residents.map((r, ri) => (
+                                <div key={ri} className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-2.5 border border-border/50">
+                                  <span className="text-xs font-mono font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded shrink-0">
+                                    Rm {r.room}
+                                  </span>
+                                  <span className="font-semibold text-sm text-foreground min-w-[160px]">{r.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-auto text-right">{r.detail}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>

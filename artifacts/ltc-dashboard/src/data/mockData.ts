@@ -44,8 +44,11 @@ export type FamilyQuestion = {
 };
 
 export type QIRow = {
-  metric: string; total: number; highRisk: number;
+  metric: string;
+  total: number;
+  highRisk: number;
   trend: "up" | "down" | "stable";
+  residents: { name: string; room: string; detail: string }[];
 };
 
 export type ResidentProfile = { pmhx: string; sochx: string; ap: string };
@@ -275,20 +278,86 @@ export function getMockProfile(residentId: number): ResidentProfile {
 }
 
 // ── QI Metrics ─────────────────────────────────────────────────────────────────
-export function getQIMetrics(residentIds: number[]): QIRow[] {
-  const n = residentIds.length;
-  const falls = residentIds.filter(id => getMockFalls(id).length > 0).length;
-  const lax = residentIds.filter(id => getMockPRNLaxCount(id) > 2).length;
-  const ap = residentIds.filter(id => getMockPRNAntipsychoticCount(id) > 0).length;
-  const poly = residentIds.filter(id => getMockMeds(id).length >= 8).length;
+export function getQIMetrics(
+  residents: { residentId: number; name: string; room: string | null }[],
+): QIRow[] {
+  const fallResidents  = residents.filter(r => getMockFalls(r.residentId).length > 0);
+  const laxResidents   = residents.filter(r => getMockPRNLaxCount(r.residentId) > 2);
+  const apResidents    = residents.filter(r => getMockPRNAntipsychoticCount(r.residentId) > 0);
+  const polyResidents  = residents.filter(r => getMockMeds(r.residentId).length >= 8);
+
+  // deterministic subsets for metrics without per-resident APIs
+  const bmGapResidents   = residents.filter((_, i) => (i * 7 + 3) % 10 < 3);
+  const bristolResidents = residents.filter((_, i) => (i * 11 + 2) % 10 < 2);
+  const ulcerResidents   = residents.filter((_, i) => (i * 13 + 5) % 12 === 0);
+
+  // Antipsychotics w/o CIHI Exclusion — ~80% of AP users lack a documented exclusion diagnosis
+  // CIHI exclusion criteria: schizophrenia, Huntington's disease, Tourette's syndrome
+  const noCIHIResidents = apResidents.filter((_, i) => i % 5 !== 2);
+
   return [
-    { metric: "48-Hour BM Gaps", total: Math.round(n * 0.32), highRisk: Math.round(n * 0.12), trend: "stable" },
-    { metric: "Bristol Type 1–2", total: Math.round(n * 0.18), highRisk: Math.round(n * 0.06), trend: "up" },
-    { metric: "PRN Laxative Doses (14d)", total: lax, highRisk: Math.round(lax * 0.4), trend: "down" },
-    { metric: "Polypharmacy (>8 meds)", total: poly, highRisk: Math.round(poly * 0.5), trend: "stable" },
-    { metric: "Falls (Past 365 Days)", total: falls, highRisk: Math.round(falls * 0.35), trend: "stable" },
-    { metric: "Pressure Ulcers", total: Math.round(n * 0.08), highRisk: Math.round(n * 0.03), trend: "down" },
-    { metric: "Antipsychotic Use (PRN)", total: ap, highRisk: Math.round(ap * 0.6), trend: "up" },
+    {
+      metric: "48-Hour BM Gaps",
+      total: bmGapResidents.length,
+      highRisk: bmGapResidents.filter((_, i) => i % 3 === 0).length,
+      trend: "stable",
+      residents: bmGapResidents.map((r, i) => ({
+        name: r.name, room: r.room ?? "—",
+        detail: i % 3 === 0 ? "72h+ gap — urgent review" : "48–72h gap — monitor",
+      })),
+    },
+    {
+      metric: "Bristol Type 1–2",
+      total: bristolResidents.length,
+      highRisk: Math.round(bristolResidents.length * 0.33),
+      trend: "up",
+      residents: bristolResidents.map(r => ({ name: r.name, room: r.room ?? "—", detail: "Hard/lumpy stools documented" })),
+    },
+    {
+      metric: "PRN Laxative Doses (14d)",
+      total: laxResidents.length,
+      highRisk: Math.round(laxResidents.length * 0.4),
+      trend: "down",
+      residents: laxResidents.map(r => ({ name: r.name, room: r.room ?? "—", detail: `${getMockPRNLaxCount(r.residentId)} doses in 14 days` })),
+    },
+    {
+      metric: "Polypharmacy (>8 meds)",
+      total: polyResidents.length,
+      highRisk: Math.round(polyResidents.length * 0.5),
+      trend: "stable",
+      residents: polyResidents.map(r => ({ name: r.name, room: r.room ?? "—", detail: `${getMockMeds(r.residentId).length} active medications` })),
+    },
+    {
+      metric: "Falls (Past 365 Days)",
+      total: fallResidents.length,
+      highRisk: Math.round(fallResidents.length * 0.35),
+      trend: "stable",
+      residents: fallResidents.map(r => ({ name: r.name, room: r.room ?? "—", detail: `${getMockFalls(r.residentId).length} fall(s) recorded` })),
+    },
+    {
+      metric: "Pressure Ulcers",
+      total: ulcerResidents.length,
+      highRisk: Math.round(ulcerResidents.length * 0.38),
+      trend: "down",
+      residents: ulcerResidents.map(r => ({ name: r.name, room: r.room ?? "—", detail: "Active wound — skin assessment required" })),
+    },
+    {
+      metric: "Antipsychotic Use (PRN)",
+      total: apResidents.length,
+      highRisk: Math.round(apResidents.length * 0.6),
+      trend: "up",
+      residents: apResidents.map(r => ({ name: r.name, room: r.room ?? "—", detail: `${getMockPRNAntipsychoticCount(r.residentId)} PRN dose(s) in 14 days` })),
+    },
+    {
+      metric: "Antipsychotics w/o CIHI Exclusion",
+      total: noCIHIResidents.length,
+      highRisk: noCIHIResidents.length,
+      trend: "up",
+      residents: noCIHIResidents.map(r => ({
+        name: r.name, room: r.room ?? "—",
+        detail: "On antipsychotic — no CIHI exclusion diagnosis (schizophrenia, Huntington's, Tourette's) documented",
+      })),
+    },
   ];
 }
 
