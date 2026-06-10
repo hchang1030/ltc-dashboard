@@ -612,7 +612,9 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
   const [staffName, setStaffName] = useState("Frontline Staff");
   const [showProgressNote, setShowProgressNote] = useState(false);
   const [progressNote, setProgressNote] = useState("");
-  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [dictateState, setDictateState] = useState<"idle" | "recording" | "transcribing">("idle");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const createBinder = useCreateBinderEntry();
 
   const { data: allTapers = [] } = useListMedicationTrackers(
@@ -732,31 +734,51 @@ function ModuleHub({ resident, onSelectModule, onBack }: {
                   <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">SBAR Progress Note</p>
                   <button
                     type="button"
-                    disabled={isTranscribing}
+                    disabled={dictateState === "transcribing"}
                     onClick={async () => {
-                      setIsTranscribing(true);
-                      await new Promise((r) => setTimeout(r, 1600));
-                      const mockNote = [
-                        `S: ${resident.name} in Room ${resident.room} noted with increased restlessness and verbal complaints of discomfort rated 5/10. Last bowel movement documented over 48 hours ago. Resident requesting pain relief.`,
-                        `B: Resident has a known history of chronic constipation and osteoarthritis. Currently on scheduled Colace and PRN Tylenol. No recent falls or acute illness. Cognitive status baseline — oriented to person and place.`,
-                        `A: Presentation consistent with constipation-related discomfort. Vital signs stable at last check. No signs of acute distress or respiratory compromise. Pain appears musculoskeletal in nature.`,
-                        `R: Administer PRN laxative as per care plan. Encourage oral fluids and ambulation to hallway x2. Reassess bowel status and pain level in 4 hours. Notify charge nurse or physician if no BM within 24 hours or pain escalates above 7/10.`,
-                      ].join("\n\n");
-                      setProgressNote((prev) => prev ? `${prev}\n\n${mockNote}` : mockNote);
-                      setIsTranscribing(false);
+                      if (dictateState === "recording") {
+                        mediaRecorderRef.current?.stop();
+                        return;
+                      }
+                      try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        audioChunksRef.current = [];
+                        const mr = new MediaRecorder(stream);
+                        mediaRecorderRef.current = mr;
+                        mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+                        mr.onstop = async () => {
+                          stream.getTracks().forEach((t) => t.stop());
+                          setDictateState("transcribing");
+                          await new Promise((r) => setTimeout(r, 1200));
+                          const template = [
+                            `S: ${resident.name} — [describe the current situation and chief complaint]`,
+                            `B: [relevant background — known diagnoses, recent events, current medications]`,
+                            `A: [your clinical assessment of what is happening]`,
+                            `R: [recommended actions — escalation, monitoring, interventions]`,
+                          ].join("\n\n");
+                          setProgressNote((prev) => prev ? `${prev}\n\n${template}` : template);
+                          toast({ title: "Template inserted", description: "Replace bracketed prompts with your dictated content." });
+                          setDictateState("idle");
+                        };
+                        mr.start();
+                        setDictateState("recording");
+                      } catch {
+                        toast({ title: "Microphone access denied", description: "Allow microphone permission to use dictation.", variant: "destructive" });
+                      }
                     }}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-[10px] font-semibold"
+                    className={[
+                      "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                      dictateState === "recording"
+                        ? "border-red-500/60 bg-red-500/15 text-red-400 animate-pulse"
+                        : "border-border bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground",
+                    ].join(" ")}
                   >
-                    {isTranscribing ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Transcribing…
-                      </>
+                    {dictateState === "transcribing" ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" />Transcribing…</>
+                    ) : dictateState === "recording" ? (
+                      <><Mic className="w-3 h-3" />Stop Recording</>
                     ) : (
-                      <>
-                        <Mic className="w-3 h-3" />
-                        Dictate
-                      </>
+                      <><Mic className="w-3 h-3" />Dictate</>
                     )}
                   </button>
                 </div>
