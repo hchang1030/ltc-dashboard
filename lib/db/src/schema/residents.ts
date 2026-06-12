@@ -15,6 +15,7 @@ export const residentsTable = pgTable("residents", {
   sdmName: text("sdm_name"),
   sdmRelation: text("sdm_relation"),
   sdmPhone: text("sdm_phone"),
+  stabilityStatus: text("stability_status").notNull().default("stable"),
 });
 
 export const insertResidentSchema = createInsertSchema(residentsTable).omit({ id: true });

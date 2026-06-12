@@ -51,6 +51,7 @@ import type {
   ResidentDemographicsInput,
   ResidentOrder,
   ResidentOrderInput,
+  StabilityStatusInput,
   VitalEvent,
   VitalEventInput,
 } from "./api.schemas";
@@ -815,6 +816,94 @@ export const useUpdateResidentDemographics = <
   TContext
 > => {
   return useMutation(getUpdateResidentDemographicsMutationOptions(options));
+};
+
+/**
+ * @summary Update a resident's stability status dot
+ */
+export const getUpdateResidentStabilityUrl = (residentId: number) => {
+  return `/api/residents/${residentId}/stability`;
+};
+
+export const updateResidentStability = async (
+  residentId: number,
+  stabilityStatusInput: StabilityStatusInput,
+  options?: RequestInit,
+): Promise<Resident> => {
+  return customFetch<Resident>(getUpdateResidentStabilityUrl(residentId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(stabilityStatusInput),
+  });
+};
+
+export const getUpdateResidentStabilityMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateResidentStability>>,
+    TError,
+    { residentId: number; data: BodyType<StabilityStatusInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateResidentStability>>,
+  TError,
+  { residentId: number; data: BodyType<StabilityStatusInput> },
+  TContext
+> => {
+  const mutationKey = ["updateResidentStability"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateResidentStability>>,
+    { residentId: number; data: BodyType<StabilityStatusInput> }
+  > = (props) => {
+    const { residentId, data } = props ?? {};
+
+    return updateResidentStability(residentId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateResidentStabilityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateResidentStability>>
+>;
+export type UpdateResidentStabilityMutationBody =
+  BodyType<StabilityStatusInput>;
+export type UpdateResidentStabilityMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a resident's stability status dot
+ */
+export const useUpdateResidentStability = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateResidentStability>>,
+    TError,
+    { residentId: number; data: BodyType<StabilityStatusInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateResidentStability>>,
+  TError,
+  { residentId: number; data: BodyType<StabilityStatusInput> },
+  TContext
+> => {
+  return useMutation(getUpdateResidentStabilityMutationOptions(options));
 };
 
 /**

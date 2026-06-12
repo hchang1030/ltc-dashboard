@@ -30,6 +30,9 @@ export const ListResidentsResponseItem = zod.object({
   sdmName: zod.string().nullish(),
   sdmRelation: zod.string().nullish(),
   sdmPhone: zod.string().nullish(),
+  stabilityStatus: zod.enum(["stable", "watch", "unstable"]),
+  recentFallCount: zod.number(),
+  recentMedChangeCount: zod.number(),
 });
 export const ListResidentsResponse = zod.array(ListResidentsResponseItem);
 
@@ -145,6 +148,38 @@ export const UpdateResidentDemographicsResponse = zod.object({
   sdmName: zod.string().nullish(),
   sdmRelation: zod.string().nullish(),
   sdmPhone: zod.string().nullish(),
+  stabilityStatus: zod.enum(["stable", "watch", "unstable"]),
+  recentFallCount: zod.number(),
+  recentMedChangeCount: zod.number(),
+});
+
+/**
+ * @summary Update a resident's stability status dot
+ */
+export const UpdateResidentStabilityParams = zod.object({
+  residentId: zod.coerce.number(),
+});
+
+export const UpdateResidentStabilityBody = zod.object({
+  status: zod.enum(["stable", "watch", "unstable"]),
+});
+
+export const UpdateResidentStabilityResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  room: zod.string(),
+  isFavorited: zod.boolean(),
+  dob: zod.coerce.date().nullish(),
+  phn: zod.string().nullish(),
+  codeStatus: zod.string().nullish(),
+  allergies: zod.array(zod.string()).optional(),
+  infectionFlags: zod.array(zod.string()).optional(),
+  sdmName: zod.string().nullish(),
+  sdmRelation: zod.string().nullish(),
+  sdmPhone: zod.string().nullish(),
+  stabilityStatus: zod.enum(["stable", "watch", "unstable"]),
+  recentFallCount: zod.number(),
+  recentMedChangeCount: zod.number(),
 });
 
 /**
@@ -171,6 +206,9 @@ export const ToggleFavoriteResponse = zod.object({
   sdmName: zod.string().nullish(),
   sdmRelation: zod.string().nullish(),
   sdmPhone: zod.string().nullish(),
+  stabilityStatus: zod.enum(["stable", "watch", "unstable"]),
+  recentFallCount: zod.number(),
+  recentMedChangeCount: zod.number(),
 });
 
 /**

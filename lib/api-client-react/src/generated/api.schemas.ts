@@ -9,6 +9,15 @@ export interface HealthStatus {
   status: string;
 }
 
+export type ResidentStabilityStatus =
+  (typeof ResidentStabilityStatus)[keyof typeof ResidentStabilityStatus];
+
+export const ResidentStabilityStatus = {
+  stable: "stable",
+  watch: "watch",
+  unstable: "unstable",
+} as const;
+
 export interface Resident {
   id: number;
   name: string;
@@ -28,6 +37,22 @@ export interface Resident {
   sdmRelation?: string | null;
   /** @nullable */
   sdmPhone?: string | null;
+  stabilityStatus: ResidentStabilityStatus;
+  recentFallCount: number;
+  recentMedChangeCount: number;
+}
+
+export type StabilityStatusInputStatus =
+  (typeof StabilityStatusInputStatus)[keyof typeof StabilityStatusInputStatus];
+
+export const StabilityStatusInputStatus = {
+  stable: "stable",
+  watch: "watch",
+  unstable: "unstable",
+} as const;
+
+export interface StabilityStatusInput {
+  status: StabilityStatusInputStatus;
 }
 
 export interface ResidentDemographicsInput {

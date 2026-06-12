@@ -5,6 +5,7 @@ import {
   Droplets, Zap, Brain, Utensils, AlertOctagon, Activity, Megaphone,
   FileText, MessageCircle, Send, BookOpen,
   Clipboard, Trash2, Pencil, Check, Mic, Loader2,
+  ShieldAlert, AlertTriangle, Pill,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PatientOverlay } from "@/components/PatientOverlay";
@@ -14,6 +15,7 @@ import { getMockPRNLaxCount, getMockPRNAntipsychoticCount, getMockFalls } from "
 import {
   useListResidents,
   useToggleFavorite,
+  useUpdateResidentStability,
   useCreateBowelMovement,
   useCreatePainEvent,
   useCreateBehaviorEvent,
@@ -274,11 +276,13 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
   const { notesQueue } = useNotesQueue();
 
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data: residents = [], isLoading } = useListResidents();
   const { data: summary } = useGetPhysicianSummary({
     query: { queryKey: getGetPhysicianSummaryQueryKey(), refetchInterval: 60_000 },
   });
   const toggleFav = useToggleFavorite();
+  const updateStability = useUpdateResidentStability();
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -308,6 +312,31 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
     toggleFav.mutate(
       { residentId: resident.id, data: { isFavorited: !resident.isFavorited } },
       { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListResidentsQueryKey() }) },
+    );
+  };
+
+  const STABILITY_CYCLE: Record<string, "stable" | "watch" | "unstable"> = {
+    stable: "watch",
+    watch: "unstable",
+    unstable: "stable",
+  };
+
+  const handleDotClick = (e: React.MouseEvent, resident: Resident) => {
+    e.stopPropagation();
+    const next = STABILITY_CYCLE[resident.stabilityStatus] ?? "watch";
+    queryClient.setQueryData(
+      getListResidentsQueryKey(),
+      (old: Resident[] | undefined) =>
+        old?.map((r) => r.id === resident.id ? { ...r, stabilityStatus: next } : r),
+    );
+    updateStability.mutate(
+      { residentId: resident.id, data: { status: next } },
+      {
+        onError: () => {
+          queryClient.invalidateQueries({ queryKey: getListResidentsQueryKey() });
+          toast({ title: "Update failed", description: "Could not save stability status.", variant: "destructive" });
+        },
+      },
     );
   };
 
@@ -408,25 +437,55 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
           </div>
         )}
         <ul>
-          {filtered.map((resident) => (
-            <li key={resident.id} className="flex items-center gap-3 px-4 border-b border-border/40 last:border-0">
-              <button onClick={(e) => handleStar(e, resident)}
-                className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 hover:bg-amber-500/10 active:bg-amber-500/20 transition-colors">
-                <Star className={["w-6 h-6 transition-colors", resident.isFavorited ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"].join(" ")} />
-              </button>
-              <span className="font-mono font-bold text-sm bg-muted/60 border border-border px-2.5 py-1 rounded-lg text-muted-foreground shrink-0 w-14 text-center">
-                {resident.room}
-              </span>
-              <div className="flex-1 min-w-0 py-4">
-                <p className="font-semibold text-foreground text-base truncate">{resident.name}</p>
-                <div className="mt-1"><GutBadge level={alertMap[resident.id] ?? "unknown"} /></div>
-              </div>
-              <button onClick={() => onSelect(resident)}
-                className="shrink-0 flex items-center gap-1.5 bg-primary hover:bg-primary/80 active:scale-95 text-primary-foreground font-bold text-sm px-4 py-3 rounded-xl transition-all shadow-md shadow-primary/20">
-                Chart <ChevronRight className="w-4 h-4" />
-              </button>
-            </li>
-          ))}
+          {filtered.map((resident) => {
+            const stability = resident.stabilityStatus ?? "stable";
+            const dotCfg = stability === "unstable"
+              ? { bg: "bg-red-500", ring: "ring-2 ring-red-400/50", label: "Unstable — click to change" }
+              : stability === "watch"
+              ? { bg: "bg-amber-400", ring: "ring-2 ring-amber-400/50", label: "Watch / Deteriorating — click to change" }
+              : { bg: "bg-emerald-500", ring: "ring-2 ring-emerald-400/40", label: "Stable — click to change" };
+            return (
+              <li key={resident.id} className="flex items-center gap-3 px-4 border-b border-border/40 last:border-0">
+                <button onClick={(e) => handleStar(e, resident)}
+                  className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 hover:bg-amber-500/10 active:bg-amber-500/20 transition-colors">
+                  <Star className={["w-6 h-6 transition-colors", resident.isFavorited ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"].join(" ")} />
+                </button>
+                <span className="font-mono font-bold text-sm bg-muted/60 border border-border px-2.5 py-1 rounded-lg text-muted-foreground shrink-0 w-14 text-center">
+                  {resident.room}
+                </span>
+                <div className="flex-1 min-w-0 py-3">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="font-semibold text-foreground text-base truncate">{resident.name}</p>
+                    {(resident.infectionFlags?.length ?? 0) > 0 && (
+                      <span title={`Infection: ${resident.infectionFlags?.join(", ")}`}>
+                        <ShieldAlert className="w-4 h-4 text-orange-400 shrink-0" />
+                      </span>
+                    )}
+                    {(resident.recentFallCount ?? 0) > 0 && (
+                      <span title={`${resident.recentFallCount} fall${resident.recentFallCount === 1 ? "" : "s"} in past 60 days`}>
+                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                      </span>
+                    )}
+                    {(resident.recentMedChangeCount ?? 0) > 0 && (
+                      <span title={`${resident.recentMedChangeCount} med change${resident.recentMedChangeCount === 1 ? "" : "s"} in past 60 days`}>
+                        <Pill className="w-4 h-4 text-violet-400 shrink-0" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1"><GutBadge level={alertMap[resident.id] ?? "unknown"} /></div>
+                </div>
+                <button
+                  onClick={(e) => handleDotClick(e, resident)}
+                  title={dotCfg.label}
+                  className={["w-4 h-4 rounded-full shrink-0 transition-all cursor-pointer hover:scale-125 active:scale-110", dotCfg.bg, dotCfg.ring].join(" ")}
+                />
+                <button onClick={() => onSelect(resident)}
+                  className="shrink-0 flex items-center gap-1.5 bg-primary hover:bg-primary/80 active:scale-95 text-primary-foreground font-bold text-sm px-4 py-3 rounded-xl transition-all shadow-md shadow-primary/20">
+                  Chart <ChevronRight className="w-4 h-4" />
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>

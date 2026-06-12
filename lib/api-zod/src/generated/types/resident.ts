@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ResidentStabilityStatus } from "./residentStabilityStatus";
 
 export interface Resident {
   id: number;
@@ -25,4 +26,7 @@ export interface Resident {
   sdmRelation?: string | null;
   /** @nullable */
   sdmPhone?: string | null;
+  stabilityStatus: ResidentStabilityStatus;
+  recentFallCount: number;
+  recentMedChangeCount: number;
 }

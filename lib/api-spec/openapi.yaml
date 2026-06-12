@@ -183,6 +183,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/Resident"
 
+  /residents/{residentId}/stability:
+    patch:
+      operationId: updateResidentStability
+      tags: [residents]
+      summary: Update a resident's stability status dot
+      parameters:
+        - name: residentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StabilityStatusInput"
+      responses:
+        "200":
+          description: Updated resident
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resident"
+
   /residents/{residentId}/favorite:
     patch:
       operationId: toggleFavorite
@@ -623,7 +648,7 @@ components:
 
     Resident:
       type: object
-      required: [id, name, room, isFavorited]
+      required: [id, name, room, isFavorited, stabilityStatus, recentFallCount, recentMedChangeCount]
       properties:
         id:
           type: integer
@@ -654,6 +679,21 @@ components:
           type: ["string", "null"]
         sdmPhone:
           type: ["string", "null"]
+        stabilityStatus:
+          type: string
+          enum: [stable, watch, unstable]
+        recentFallCount:
+          type: integer
+        recentMedChangeCount:
+          type: integer
+
+    StabilityStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [stable, watch, unstable]
 
     ResidentDemographicsInput:
       type: object

@@ -58,5 +58,8 @@ export * from "./residentDemographicsInput";
 export * from "./residentOrder";
 export * from "./residentOrderInput";
 export * from "./residentOrderStatus";
+export * from "./residentStabilityStatus";
+export * from "./stabilityStatusInput";
+export * from "./stabilityStatusInputStatus";
 export * from "./vitalEvent";
 export * from "./vitalEventInput";
