@@ -25,6 +25,7 @@ import {
   useUpdateResidentDemographics,
   useListMedicationTrackers,
   getListMedicationTrackersQueryKey,
+  useUpdateResidentStability,
 } from "@workspace/api-client-react";
 import type { ResidentAlertSummary, BinderEntry, ContactDirectoryEntry, CommunicationLog, OrderTemplate } from "@workspace/api-client-react";
 import {
@@ -74,6 +75,8 @@ import {
   ChevronUp,
   Check,
   Copy,
+  ShieldAlert,
+  Pill,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo, Fragment, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -4650,6 +4653,8 @@ export default function PhysicianDashboard() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [physFavs, setPhysFavs] = useState<Set<number>>(() => loadPhysFavs());
   const [physFilter, setPhysFilter] = useState<"all" | "mine">("all");
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const togglePhysFav = useCallback((residentId: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -4714,6 +4719,43 @@ export default function PhysicianDashboard() {
     if (physFilter === "mine") return sorted.filter((r) => physFavs.has(r.residentId));
     return sorted;
   }, [data, sortKey, sortDir, physFilter, physFavs]);
+
+  const { data: residentList = [] } = useListResidents({
+    query: { queryKey: getListResidentsQueryKey() },
+  });
+  const residentMap = useMemo(
+    () => new Map(residentList.map((r) => [r.id, r])),
+    [residentList],
+  );
+
+  const updateStability = useUpdateResidentStability();
+  const STABILITY_CYCLE: Record<string, "stable" | "watch" | "unstable"> = {
+    stable: "watch",
+    watch: "unstable",
+    unstable: "stable",
+  };
+  const handleStabilityClick = useCallback(
+    (e: React.MouseEvent, residentId: number) => {
+      e.stopPropagation();
+      const current = residentMap.get(residentId)?.stabilityStatus ?? "stable";
+      const next = STABILITY_CYCLE[current] ?? "watch";
+      queryClient.setQueryData(
+        getListResidentsQueryKey(),
+        (old: typeof residentList | undefined) =>
+          old?.map((r) => r.id === residentId ? { ...r, stabilityStatus: next } : r),
+      );
+      updateStability.mutate(
+        { residentId, data: { status: next } },
+        {
+          onError: () => {
+            queryClient.invalidateQueries({ queryKey: getListResidentsQueryKey() });
+            toast({ title: "Update failed", description: "Could not save stability status.", variant: "destructive" });
+          },
+        },
+      );
+    },
+    [residentMap, updateStability, queryClient, toast],
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -4919,6 +4961,14 @@ export default function PhysicianDashboard() {
             {/* Badge legend */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground bg-card border border-border rounded-lg px-4 py-2.5">
               <span className="font-bold uppercase tracking-wider text-muted-foreground/60 shrink-0">Legend:</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block shrink-0" /> Stable</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block shrink-0" /> Watch</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-500 inline-block shrink-0" /> Unstable</span>
+              <span className="text-muted-foreground/30">|</span>
+              <span className="flex items-center gap-1"><ShieldAlert className="w-3.5 h-3.5 text-orange-400 shrink-0" /> Infection flag</span>
+              <span className="flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" /> Recent fall (60d)</span>
+              <span className="flex items-center gap-1"><Pill className="w-3.5 h-3.5 text-violet-400 shrink-0" /> Med change (60d)</span>
+              <span className="text-muted-foreground/30">|</span>
               <span><span className="text-base">💩</span> No BM (48h+)</span>
               <span><span className="text-base">💥</span> Severe pain (24h)</span>
               <span><span className="text-base">🧠</span> 2+ behaviors (24h)</span>
@@ -4948,8 +4998,10 @@ export default function PhysicianDashboard() {
                   <tr className="border-b border-border bg-muted/40">
                     <th className="px-3 py-4 w-10" title="Save to My Patients"><Star className="w-3.5 h-3.5 text-muted-foreground/40 mx-auto" /></th>
                     <SortTh label="Alert"             sortK="alertLevel" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <th className="px-3 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground/70 whitespace-nowrap" title="Stability status — click dot to update">Stability</th>
                     <SortTh label="Last Name"         sortK="lastName"   currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="First Name"        sortK="firstName"  currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <th className="px-3 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground/70 whitespace-nowrap" title="Infection / Fall / Med-change flags">Flags</th>
                     <SortTh label="MRP"               sortK="mrp"        currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Room"              sortK="room"       currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Last BM"           sortK="lastBM"     currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
@@ -5006,6 +5058,26 @@ export default function PhysicianDashboard() {
                             <span className={["w-3 h-3 rounded-full", alertDot].join(" ")} data-testid={`alert-dot-${resident.residentId}`} />
                           </div>
                         </td>
+                        <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                          {(() => {
+                            const stability = residentMap.get(resident.residentId)?.stabilityStatus ?? "stable";
+                            const dotCfg = stability === "unstable"
+                              ? { bg: "bg-red-500", ring: "ring-2 ring-red-400/50", label: "Unstable — click to change" }
+                              : stability === "watch"
+                              ? { bg: "bg-amber-400", ring: "ring-2 ring-amber-400/50", label: "Watch / Deteriorating — click to change" }
+                              : { bg: "bg-emerald-500", ring: "ring-2 ring-emerald-400/40", label: "Stable — click to change" };
+                            return (
+                              <div className="flex items-center justify-center">
+                                <button
+                                  onClick={(e) => handleStabilityClick(e, resident.residentId)}
+                                  title={dotCfg.label}
+                                  data-testid={`stability-dot-${resident.residentId}`}
+                                  className={["w-4 h-4 rounded-full shrink-0 transition-all cursor-pointer hover:scale-125 active:scale-110", dotCfg.bg, dotCfg.ring].join(" ")}
+                                />
+                              </div>
+                            );
+                          })()}
+                        </td>
                         <td className="px-4 py-4">
                           <span className={nameCls} data-testid={`name-resident-${resident.residentId}`}>
                             {lastName}
@@ -5013,6 +5085,25 @@ export default function PhysicianDashboard() {
                         </td>
                         <td className="px-4 py-4">
                           <span className="text-muted-foreground">{firstName}</span>
+                        </td>
+                        <td className="px-3 py-4">
+                          <div className="flex items-center gap-1">
+                            {(residentMap.get(resident.residentId)?.infectionFlags?.length ?? 0) > 0 && (
+                              <span title={`Infection: ${residentMap.get(resident.residentId)?.infectionFlags?.join(", ")}`}>
+                                <ShieldAlert className="w-4 h-4 text-orange-400 shrink-0" />
+                              </span>
+                            )}
+                            {(residentMap.get(resident.residentId)?.recentFallCount ?? 0) > 0 && (
+                              <span title={`${residentMap.get(resident.residentId)?.recentFallCount} fall(s) in past 60 days`}>
+                                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                              </span>
+                            )}
+                            {(residentMap.get(resident.residentId)?.recentMedChangeCount ?? 0) > 0 && (
+                              <span title={`${residentMap.get(resident.residentId)?.recentMedChangeCount} med change(s) in past 60 days`}>
+                                <Pill className="w-4 h-4 text-violet-400 shrink-0" />
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4 text-xs text-muted-foreground whitespace-nowrap">{getMRP(resident.residentId)}</td>
                         <td className="px-4 py-4 text-muted-foreground font-mono">{resident.room}</td>
