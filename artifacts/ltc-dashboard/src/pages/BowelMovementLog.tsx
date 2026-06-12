@@ -269,6 +269,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
   const [filter, setFilter] = useState<ViewFilter>("all");
   const [search, setSearch] = useState("");
+  const [flagFilters, setFlagFilters] = useState<Set<string>>(new Set());
   const [time, setTime] = useState(new Date());
   const [showBinder, setShowBinder] = useState(false);
   const [showCommHub, setShowCommHub] = useState(false);
@@ -295,15 +296,38 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
     return map;
   }, [summary]);
 
+  const FLAG_MATCHERS: Record<string, (r: Resident) => boolean> = {
+    unstable: (r) => r.stabilityStatus === "unstable",
+    watch: (r) => r.stabilityStatus === "watch",
+    infection: (r) => (r.infectionFlags?.length ?? 0) > 0,
+    fall: (r) => (r.recentFallCount ?? 0) > 0,
+    med: (r) => (r.recentMedChangeCount ?? 0) > 0,
+  };
+
+  const baseList = useMemo(() => {
+    if (filter === "favorites") return residents.filter((r) => r.isFavorited);
+    return residents;
+  }, [residents, filter]);
+
+  const chipCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const key of Object.keys(FLAG_MATCHERS)) {
+      counts[key] = baseList.filter(FLAG_MATCHERS[key]).length;
+    }
+    return counts;
+  }, [baseList]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const filtered = useMemo(() => {
-    let list = residents;
-    if (filter === "favorites") list = list.filter((r) => r.isFavorited);
+    let list = baseList;
+    if (flagFilters.size > 0) {
+      list = list.filter((r) => [...flagFilters].every((k) => FLAG_MATCHERS[k]?.(r)));
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((r) => r.name.toLowerCase().includes(q) || r.room.toLowerCase().includes(q));
     }
     return list;
-  }, [residents, filter, search]);
+  }, [baseList, flagFilters, search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const favCount = residents.filter((r) => r.isFavorited).length;
 
@@ -425,6 +449,52 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
           <input type="text" placeholder="Search by name or room number..." value={search} onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-card border border-border rounded-xl pl-12 pr-10 py-3.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary text-base" />
           {search && <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              { key: "unstable", label: "Unstable",      activeBg: "bg-red-600",    activeBorder: "border-red-500",    activeText: "text-white",        dot: "bg-red-400" },
+              { key: "watch",    label: "Watch",         activeBg: "bg-amber-500",  activeBorder: "border-amber-400",  activeText: "text-white",        dot: "bg-amber-300" },
+              { key: "infection",label: "Infection",     activeBg: "bg-orange-600", activeBorder: "border-orange-500", activeText: "text-white",        dot: null },
+              { key: "fall",     label: "Recent Fall",   activeBg: "bg-rose-700",   activeBorder: "border-rose-500",   activeText: "text-white",        dot: null },
+              { key: "med",      label: "Med Change",    activeBg: "bg-violet-700", activeBorder: "border-violet-500", activeText: "text-white",        dot: null },
+            ] as const
+          ).map(({ key, label, activeBg, activeBorder, activeText, dot }) => {
+            const active = flagFilters.has(key);
+            const cnt = chipCounts[key] ?? 0;
+            return (
+              <button
+                key={key}
+                onClick={() => {
+                  setFlagFilters((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(key)) next.delete(key); else next.add(key);
+                    return next;
+                  });
+                }}
+                className={[
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all",
+                  active
+                    ? `${activeBg} ${activeBorder} ${activeText} shadow-sm`
+                    : "bg-card border-border text-muted-foreground hover:border-muted-foreground/60",
+                ].join(" ")}
+              >
+                {dot && <span className={["w-2 h-2 rounded-full shrink-0", dot].join(" ")} />}
+                {label}
+                <span className={["px-1.5 py-0.5 rounded-full text-[10px] font-bold", active ? "bg-white/20" : "bg-muted"].join(" ")}>
+                  {cnt}
+                </span>
+              </button>
+            );
+          })}
+          {flagFilters.size > 0 && (
+            <button
+              onClick={() => setFlagFilters(new Set())}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border-2 border-dashed border-muted-foreground/40 text-muted-foreground hover:border-muted-foreground transition-all"
+            >
+              <X className="w-3 h-3" /> Clear
+            </button>
+          )}
         </div>
       </div>
 
