@@ -5,7 +5,7 @@ import {
   Droplets, Zap, Brain, Utensils, AlertOctagon, Activity, Megaphone,
   FileText, MessageCircle, Send, BookOpen,
   Clipboard, Trash2, Pencil, Check, Mic, Loader2,
-  ShieldAlert, AlertTriangle, Pill,
+  ShieldAlert, AlertTriangle, Pill, HelpCircle, ChevronDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PatientOverlay } from "@/components/PatientOverlay";
@@ -266,6 +266,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 // ── ── ── Screen 1: Resident List ── ── ── ── ── ── ── ── ── ── ── ── ── ── ──
 
+const LEGEND_STORAGE_KEY = "ltc-resident-legend-open";
+
 function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
   const [filter, setFilter] = useState<ViewFilter>("all");
   const [search, setSearch] = useState("");
@@ -274,7 +276,23 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
   const [showBinder, setShowBinder] = useState(false);
   const [showCommHub, setShowCommHub] = useState(false);
   const [showNotesQueue, setShowNotesQueue] = useState(false);
+  const [showLegend, setShowLegend] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(LEGEND_STORAGE_KEY);
+      return stored === null ? true : stored === "true";
+    } catch {
+      return true;
+    }
+  });
   const { notesQueue } = useNotesQueue();
+
+  const toggleLegend = useCallback(() => {
+    setShowLegend((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(LEGEND_STORAGE_KEY, String(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -495,7 +513,49 @@ function ResidentList({ onSelect }: { onSelect: (r: Resident) => void }) {
               <X className="w-3 h-3" /> Clear
             </button>
           )}
+          <button
+            onClick={toggleLegend}
+            title={showLegend ? "Hide legend" : "Show icon legend"}
+            className={[
+              "ml-auto flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all",
+              showLegend
+                ? "bg-primary/10 border-primary/40 text-primary"
+                : "bg-card border-border text-muted-foreground hover:border-muted-foreground/60",
+            ].join(" ")}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            Legend
+            <ChevronDown className={["w-3 h-3 transition-transform", showLegend ? "rotate-180" : ""].join(" ")} />
+          </button>
         </div>
+
+        {showLegend && (
+          <div className="rounded-xl border border-border bg-card/60 px-4 py-3 space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Icon Legend</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-orange-400 shrink-0" />
+                <span className="text-xs text-foreground/80">Active infection flag</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                <span className="text-xs text-foreground/80">Fall(s) in past 60 days</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Pill className="w-4 h-4 text-violet-400 shrink-0" />
+                <span className="text-xs text-foreground/80">Medication change(s) in past 60 days</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1 shrink-0">
+                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-emerald-400/40 inline-block" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-amber-400 ring-2 ring-amber-400/50 inline-block" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-red-500 ring-2 ring-red-400/50 inline-block" />
+                </span>
+                <span className="text-xs text-foreground/80">Stability: green / watch / unstable — tap to cycle</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
