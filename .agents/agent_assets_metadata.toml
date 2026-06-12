@@ -12,3 +12,9 @@ id = "sDAfVR7qm28nHdbGCow0n"
 uri = "file://ARCHITECTURE.md"
 type = "text"
 title = "ARCHITECTURE.md — Full feature & architecture reference"
+
+[[outputs]]
+id = "VVc0dTXthXg3mjTHtvRyH"
+uri = "file://ltc-dashboard-source.tar.gz"
+type = "unspecified"
+title = "LTC Dashboard — Source Code"
